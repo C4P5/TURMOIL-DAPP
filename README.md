@@ -191,7 +191,19 @@ Most projects demo the happy path. We demo the system refusing to be cheated.
 | A restaurant inflates its volume | Mass balance at the plant, plus the random audit |
 | **TURMOIL inflates a load** | Every litre needs a signature from a restaurant we don't employ; the audit asks them directly |
 
-> 🚧 **Foundry test names and demo recording — WIP**
+All three are executable tests, not slides — [`contracts/test/Turmoil.t.sol`](contracts/test/Turmoil.t.sol):
+
+```
+test_RevertWhen_OnlyRestaurantSigns          one party cannot invent a pickup
+test_RevertWhen_SignatureReplayed            a signature cannot be reused
+test_SettleSlashesShortfallBeyondTolerance   inflated volume caught by mass balance
+test_AuditFailureFinesExtrapolated           a fabricated pickup costs the deposit
+testFuzz_ShortfallIsAlwaysChargedToTheCollector   (runs: 2000)
+```
+
+10 passing. The fuzz test is the one that matters: 2,000 random `(attested, received)` pairs, asserting the gap is always charged to the collector or capped at their bond — never absorbed by investors.
+
+> 🚧 **Demo recording — WIP**
 
 ---
 
@@ -216,15 +228,24 @@ Other things this system does **not** do (yet):
 
 ## Contracts
 
-> 🚧 **WIP — addresses, ABIs and verified HashScan links land as they deploy.**
+**One contract**, not four. A single operator, never upgraded — splitting this into a registry, an escrow, a lot ledger and a sampler would buy four deploys, four verifications and cross-contract authorisation for no change in behaviour.
 
-| Contract | Purpose | Status |
-|---|---|---|
-| `BatchRegistry` | Pickup lifecycle; dual EIP-712 attestation | 🚧 |
-| `PayoutEscrow` | Instant USDC payout on countersignature | 🚧 |
-| `LotRegistry` | Lot aggregation, plant receipt, mass-balance invariant | 🚧 |
-| `AuditSampler` | `0x169` sampling + extrapolated slashing | 🚧 |
-| Truck token | ERC-3643 via Hedera Asset Tokenization Studio | 🚧 |
+[`contracts/src/Turmoil.sol`](contracts/src/Turmoil.sol)
+
+| Function | What it does |
+|---|---|
+| `attest()` | Requires EIP-712 signatures from restaurant **and** collector over the same struct, with per-restaurant nonces. Pays the restaurant instantly. The restaurant never sends a transaction and never needs gas |
+| `sealLot()` | Closes the collector's open lot so the audit sample can be drawn against a fixed set |
+| `settleLot()` | Plant reports what arrived; enforces `Σ attested ≤ received + tolerance` and charges any gap to the collector's deposit |
+| `drawAudit()` | Samples `sampleBps` of the lot's batches using Hedera's PRNG at `0x169` ([HIP-351](https://hips.hedera.com/hip/hip-351)) |
+| `flagAudit()` | A sampled batch failed confirmation — fines at the sample rate, so one catch costs the whole deposit |
+| `postDeposit()` | Collector bond, sized at 10% of lot value |
+
+Every economic parameter — price per litre, tolerance, sample rate, deposit size — is owner-tunable, because the payoff they have to beat moves.
+
+**Truck share:** a separate ERC-3643 issued through Hedera's Asset Tokenization Studio, which also handles distributions to holders. `Turmoil.sol` does not reference it. 🚧
+
+> 🚧 **Deployed addresses and verified HashScan links land with the testnet deploy.**
 
 ---
 
@@ -270,7 +291,7 @@ Next.js with the Privy React SDK. Email login creates an embedded ECDSA wallet; 
 
 ```
 TURMOIL-DAPP/
-├── contracts/        # Foundry — Solidity + tests          🚧
+├── contracts/        # Foundry — Turmoil.sol + 10 tests    ✅
 ├── app/              # Next.js + Privy React SDK           🚧
 ├── agent/            # Reconciliation / anomaly flagger    🚧
 ├── docs/             # Architecture, threat model, pitch   🚧
