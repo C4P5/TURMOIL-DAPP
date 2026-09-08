@@ -24,8 +24,14 @@ contract Turmoil is EIP712, Ownable, ReentrancyGuard {
 
     uint256 public pricePerLitre; // token smallest-unit per whole litre
     uint16 public toleranceBps = 200; // 2% shrinkage allowed in transit
-    uint16 public sampleBps = 1000; // 10% of a lot's batches get audited
-    uint16 public depositBps = 1000; // collector deposit = 10% of lot value
+    uint16 public sampleBps = 3000; // 30% of a lot's batches get audited
+    uint16 public depositBps = 5000; // collector bond = 50% of lot value
+
+    /// @dev A sample of one cannot deter anything. With k=1 the catch probability
+    ///      equals the fabricated fraction f, so EV(cheat) = f·(1 − D) and no bond
+    ///      short of the entire lot's value makes that negative. Small lots need a
+    ///      floor on the sample size, not a percentage of it.
+    uint256 public constant MIN_SAMPLE = 3;
 
     mapping(address => bool) public isRestaurant;
     mapping(address => bool) public isCollector;
@@ -47,6 +53,10 @@ contract Turmoil is EIP712, Ownable, ReentrancyGuard {
         uint64 receivedLitres;
         bool isSealed;
         bool settled;
+        /// @dev Explicit flag rather than `seed != 0`. Zero is a legal seed — and it is
+        ///      the value block.prevrandao actually returns off-Hedera — so overloading
+        ///      it as "not drawn yet" silently disables the once-only guard.
+        bool drawn;
         uint256 seed;
     }
 
@@ -71,6 +81,9 @@ contract Turmoil is EIP712, Ownable, ReentrancyGuard {
     error LotClosed();
     error LotNotReady();
     error NothingToAudit();
+    error SelfDeal();
+    error UnderBonded();
+    error AlreadyDrawn();
 
     constructor(IERC20 token, uint256 pricePerLitre_) EIP712("TURMOIL", "1") Ownable(msg.sender) {
         payToken = token;
@@ -119,6 +132,9 @@ contract Turmoil is EIP712, Ownable, ReentrancyGuard {
     ) external nonReentrant returns (uint256 batchId) {
         if (block.timestamp > deadline) revert Expired();
         if (!isRestaurant[restaurant] || !isCollector[collector]) revert NotRegistered();
+        // Two ROLES is not two PARTIES. Without this, one address registered in both
+        // roles signs once, passes the signature twice, and pays itself.
+        if (restaurant == collector) revert SelfDeal();
         require(litres > 0, "zero litres");
 
         uint256 nonce = nonces[restaurant];
@@ -138,27 +154,48 @@ contract Turmoil is EIP712, Ownable, ReentrancyGuard {
         _lotBatches[lotId].push(batchId);
         lots[lotId].attestedLitres += litres;
 
-        uint256 pay = uint256(litres) * pricePerLitre;
-        emit Attested(batchId, lotId, restaurant, litres, pay);
-        payToken.safeTransfer(restaurant, pay);
+        _requireBonded(collector, lotId);
+
+        emit Attested(batchId, lotId, restaurant, litres, uint256(litres) * pricePerLitre);
+        payToken.safeTransfer(restaurant, uint256(litres) * pricePerLitre);
+    }
+
+    /// @dev The bond is the only thing any slash can ever take. If it does not cover
+    ///      the lot it secures, every enforcement path in this contract is decoration.
+    ///      This is what makes depositBps load-bearing rather than declared.
+    function _requireBonded(address collector, uint256 lotId) internal view {
+        uint256 lotValue = uint256(lots[lotId].attestedLitres) * pricePerLitre;
+        if (deposit[collector] * 10_000 < lotValue * depositBps) revert UnderBonded();
     }
 
     function _openLot(address collector) internal returns (uint256 lotId) {
         uint256 marker = openLotOf[collector];
         if (marker != 0) return marker - 1;
         lotId = lots.length;
-        lots.push(Lot(collector, 0, 0, false, false, 0));
+        lots.push(Lot(collector, 0, 0, false, false, false, 0));
         openLotOf[collector] = lotId + 1;
     }
 
     // --- settlement ---------------------------------------------------------
 
     function sealLot() external returns (uint256 lotId) {
-        uint256 marker = openLotOf[msg.sender];
+        return _seal(msg.sender);
+    }
+
+    /// @notice Force-seal a collector's open lot. Without this the collector holds a
+    ///         veto over their own enforcement: settleLot and drawAudit both require a
+    ///         sealed lot, so a collector who has just inflated one simply never seals,
+    ///         the restaurants stay paid, and neither mechanism ever runs.
+    function sealLotOf(address collector) external onlyOwner returns (uint256 lotId) {
+        return _seal(collector);
+    }
+
+    function _seal(address collector) internal returns (uint256 lotId) {
+        uint256 marker = openLotOf[collector];
         if (marker == 0) revert LotNotReady();
         lotId = marker - 1;
         lots[lotId].isSealed = true;
-        openLotOf[msg.sender] = 0;
+        openLotOf[collector] = 0;
         emit LotSealed(lotId, lots[lotId].attestedLitres);
     }
 
@@ -167,7 +204,10 @@ contract Turmoil is EIP712, Ownable, ReentrancyGuard {
     ///         the collector's deposit, never from investor funds.
     function settleLot(uint256 lotId, uint64 receivedLitres) external onlyOwner {
         Lot storage lot = lots[lotId];
-        if (!lot.isSealed || lot.settled) revert LotClosed();
+        // Distinct errors: an unsealed lot is not the same problem as a settled one,
+        // and conflating them sent a caller looking in the wrong place.
+        if (!lot.isSealed) revert LotNotReady();
+        if (lot.settled) revert LotClosed();
 
         lot.receivedLitres = receivedLitres;
         lot.settled = true;
@@ -188,22 +228,33 @@ contract Turmoil is EIP712, Ownable, ReentrancyGuard {
     function drawAudit(uint256 lotId) external onlyOwner returns (uint256[] memory sampled) {
         Lot storage lot = lots[lotId];
         if (!lot.isSealed) revert LotNotReady();
+        // Once only. Without this the drawer redraws until the sample flags whatever
+        // it wants, and "the collector cannot know what will be challenged" becomes
+        // "the owner can challenge everything".
+        if (lot.drawn) revert AlreadyDrawn();
 
-        uint256[] storage ids = _lotBatches[lotId];
-        uint256 n = ids.length;
+        uint256 n = _lotBatches[lotId].length;
         if (n == 0) revert NothingToAudit();
 
-        uint256 k = (n * sampleBps + 9_999) / 10_000; // ceil, always >= 1
+        uint256 k = (n * sampleBps + 9_999) / 10_000; // ceil
+        if (k < MIN_SAMPLE) k = MIN_SAMPLE; // a sample of one deters nothing
+        if (k > n) k = n;
+
         uint256 seed = _seed();
         lot.seed = seed;
+        lot.drawn = true;
 
+        // Partial Fisher-Yates over a memory copy: sampling WITHOUT replacement, so
+        // k draws really do cover k distinct batches. With replacement, a 3-of-3 draw
+        // could land on the same batch three times — worst exactly where the lot is
+        // smallest and deterrence is already weakest.
+        uint256[] memory pool = _lotBatches[lotId];
         sampled = new uint256[](k);
         for (uint256 i; i < k; ++i) {
-            // ponytail: sampling with replacement. Collisions only reduce coverage,
-            // never bias which batch can be picked. Swap for Fisher-Yates if k/n grows.
-            uint256 pick = ids[uint256(keccak256(abi.encode(seed, i))) % n];
-            batches[pick].audited = true;
-            sampled[i] = pick;
+            uint256 j = i + (uint256(keccak256(abi.encode(seed, i))) % (n - i));
+            (pool[i], pool[j]) = (pool[j], pool[i]);
+            sampled[i] = pool[i];
+            batches[pool[i]].audited = true;
         }
         emit AuditDrawn(lotId, seed, sampled);
     }
@@ -217,17 +268,20 @@ contract Turmoil is EIP712, Ownable, ReentrancyGuard {
         return block.prevrandao;
     }
 
-    /// @notice A sampled restaurant failed to confirm its pickup. The collector is
-    ///         fined as if `sampleBps` of the whole lot were fabricated — the same
-    ///         rate we sampled at. Faking a slice risks the entire deposit.
+    /// @notice A sampled restaurant failed to confirm its pickup. The collector loses
+    ///         the ENTIRE bond, not a proportion of it.
+    ///
+    /// Why the whole bond: any fine set to an unbiased extrapolation of the sample
+    /// gives EV(cheat) = 0 by construction, and the earlier `lotValue · sampleBps`
+    /// rule was strictly positive-EV — a caught cheat forfeited a bond worth twice
+    /// what it stole, while an uncaught one kept everything. Deterrence needs the
+    /// downside to dominate the upside, which means burning the bond and sizing the
+    /// bond above any theft the mass-balance check would let through.
     function flagAudit(uint256 batchId) external onlyOwner {
         Batch storage b = batches[batchId];
         require(b.audited && !b.failed, "not sampled");
         b.failed = true;
-
-        uint256 lotValue = uint256(lots[b.lotId].attestedLitres) * pricePerLitre;
-        uint256 fine = (lotValue * sampleBps) / 10_000;
-        emit AuditFailed(batchId, _slash(b.collector, fine));
+        emit AuditFailed(batchId, _slash(b.collector, type(uint256).max));
     }
 
     function _slash(address collector, uint256 amount) internal returns (uint256 taken) {
