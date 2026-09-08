@@ -1,7 +1,7 @@
 <h1 align="center">TURMOIL</h1>
 
 <p align="center">
-  <strong>Making fake waste oil unprofitable.</strong>
+  <strong>Oil pickup sevice + UCO audits for verifiable Biofuel operations, onchain-</strong>
 </p>
 
 <p align="center">
@@ -33,7 +33,7 @@
 
 ## The Problem
 
-Biodiesel is largely made from **used cooking oil (UCO)**. Europe pays a premium for fuel made from waste instead of virgin crops — and that premium is exactly why people cheat.
+Biodiesel is largely -and preferably- made from **used cooking oils (UCO)**. Europe pays a premium for fuel that is made from waste instead of virgin crops — and this premium is exactly why bad actors cheat.
 
 The numbers, from the people who investigate this for a living:
 
@@ -54,7 +54,7 @@ The fraud is possible because **a certificate is a claim made by one party about
 
 ## The Solution
 
-TURMOIL builds the receipt.
+TURMOIL builds the receipt - Incentivizes small bussinesses, and *ackchyually* collects UCO from reliable sources (instead of, you know, fraud).
 
 **1. Two signatures or no pickup.** A driver arrives to collect a restaurant's used oil, measures it, and shows a QR code on his phone containing the batch hash. The restaurant scans it and signs. Neither party can record a pickup alone, and the countersignature is only possible in the same room.
 
@@ -82,11 +82,11 @@ TURMOIL builds the receipt.
 
 ### Why This Qualifies
 
-- **A real, documented, unsolved market crime** — not a hypothetical. Every figure above is sourced and dated.
-- **ERC-3643, not a hand-rolled NFT.** A truck paying revenue to holders is a security. We issued it on rails built for securities — identity registry, compliance module, transfer restrictions — rather than pretending it isn't one.
+- **A real, documented, unsolved market crime** — Pretty self-exlainatory. Every figure above is sourced and dated.
+- **ERC-3643, not a hand-rolled NFT.** A truck paying revenue to holders is a security. We issued it on rails built for such — identity registry, compliance module, transfer restrictions — rather than pretending it isn't one. Because that's the right thing to do. 
 - **Hedera-native, not a copy-paste EVM deploy.** Audit sampling uses Hedera's PRNG system contract at `0x169` ([HIP-351](https://hips.hedera.com/hip/hip-351)) — no oracle, no VRF wait.
 - **Gasless for the people who don't want a wallet.** Restaurants sign typed data; they never hold HBAR or send a transaction.
-- **The economics of cheating are negative on purpose**, and the arithmetic is in this README.
+- **The economics of cheating are negative on purpose**, The arithmetic is further down in this README.
 - **We state what the system cannot do** — see [Honest Limits](#threat).
 
 ---
@@ -120,7 +120,7 @@ TURMOIL builds the receipt.
 
 ## Key Design Decisions
 
-**No middleware.** Everything is EVM contracts on Hedera plus a Next.js frontend. Business logic that matters lives on-chain where anyone can check it.
+**No middleware.** Everything is EVM contracts on Hedera + Next.js frontend. Business logic that matters lives onchain where anyone can check and audit independantly.
 
 **Restaurants never transact.** Hedera natively supports ECDSA secp256k1 keys, so a Privy embedded wallet signs EIP-712 typed data for a batch. The collector relays both signatures in one call:
 
@@ -130,7 +130,7 @@ attest(Batch calldata b, bytes calldata sigRestaurant, bytes calldata sigCollect
 
 The contract `ecrecover`s both and requires two distinct registered parties. Nobody without HBAR is ever asked to pay gas.
 
-**The collector is the residual claimant.** The restaurant is paid instantly, because a small business will not wait a week. Any reconciliation shortfall comes out of the collector's deposit — so the operator has a direct financial reason to measure honestly and to refuse an inflated number from a supplier.
+**The collector is the residual claimant.** The restaurant is paid instantly, because a small business can't wait a week. Any reconciliation shortfall comes out of the collector's deposit — so the operator has a direct financial reason to measure honestly and refuse an inflated number from a supplier.
 
 **The restaurants are the check on TURMOIL.** We collect the oil *and* issue the receipt, which is exactly the conflict of interest that broke ISCC. The answer is structural: **we cannot inflate our own volume, because every litre requires a signature from a restaurant we do not employ — and the audit challenges them directly, after the load is sealed.**
 
@@ -179,16 +179,16 @@ Most projects demo the happy path. We demo the system refusing to be cheated.
 
 ## Threat Model & Honest Limits
 
-**We cannot chemically distinguish palm oil from used cooking oil.** Neither can ISCC — that is precisely why the fraud works. Anyone claiming a blockchain solves that is selling something.
+**We cannot chemically distinguish palm oil from used cooking oil.** Hell, neither ISCC can — that is exactly why the fraud works so well. Anyone claiming a supply-chain system that solves this is straight-up making stuff up. The lateral thinking that makes this project viable is: "why would small, medium, or family-owned restaurants lie about this? We're literally paying them for picking up their goop". And there are hundreds of them - all over the world, probably discarding +100L of used oil weekly.  
 
-What we actually change: the origin claim becomes **two-sided and mass-balanced**. Every litre traces to a named restaurant that signed with its own key, and the totals cannot exceed what the plant received. Faking this at the scale the EU is currently seeing would mean fabricating thousands of restaurant counterparties, each signing independently, each surviving a random post-hoc challenge. That is a different order of difficulty from buying a certificate.
+What we actually change: the origin claim becomes **two-sided and mass-balanced**. Every litre traces to a named restaurant that signed with its own key, and the totals cannot exceed what the plant received. Faking this at the scale the EU is currently seeing would mean fabricating thousands of restaurant counterparties, each signing independently, each surviving a random post-hoc challenge. That is a different order of difficulty from buying a certificate. 
 
-Other things this system does **not** do:
+Other things this system does **not** do (yet):
 
 - It does not make the oil itself testable.
-- It does not replace an accredited certification body. It produces the evidence one would need.
-- It does not stop a plant from lying about what it received — but the plant is also the party paying, so understating costs it money, and the drivers' signed batches contradict it.
-- It assumes restaurants are repeat counterparties. A one-time supplier has weaker deterrence.
+- It does not replace an accredited certification body. It produces the evidence one would need. Exploring the feasibility of adding this to the platform is a top priority PR
+- It won't stop plants from lying about what they received — but the plant is also part the party paying, so understating costs it money, and the drivers' signed batches contradict it. An extraodinary dumb thing to do in my most honest opinion  
+- System assumes restaurants are repeat counterparties. A one-time supplier has weaker deterrence.
 
 ---
 
@@ -278,13 +278,13 @@ This project is built solo, with heavy use of **Claude Opus 5** (Anthropic) via 
 | Problem selection, domain knowledge, restaurant-industry context | ✅ All | — |
 | Market research and source verification | Direction, judgment calls | Search, fetch, fact-checking against primary sources |
 | Architecture and mechanism design | Every decision, every trade-off accepted or rejected | Proposed options, challenged assumptions, found the `0x169` and ERC-3643 paths |
-| Killed ideas (Guardian, carbon credits, a native token, ENS) | Final calls | Verification that surfaced why each failed |
+| Killed ideas (Guardian, carbon credits, native token, ENS, Etc) | Final calls | Verification that surfaced why each failed |
 | Smart contracts | 🚧 | 🚧 |
 | Frontend | 🚧 | 🚧 |
 | Tests | 🚧 | 🚧 |
 | This README | Review and corrections | Drafting |
 
-Design decisions were adversarial, not generated: the architecture below survived several rounds in which proposed features were verified against primary sources and cut when they failed. Guardian, carbon credits, a native payment token and a token floor price were all removed for documented reasons.
+Design decisions were adversarial, not generated: the architecture below survived several rounds in which proposed features were verified against primary sources and cut when they failed. Hedera's Guardian software, dMRV system with Gold Standard's methodology implementation for carbon credits creation, a native payment token, a Biofuel petrol station, a Biofuel refinery RWA token, and a token floor price were all removed for documented reasons.
 
 > 🚧 **WIP — updated per component as code lands.**
 
@@ -299,14 +299,15 @@ Design decisions were adversarial, not generated: the architecture below survive
 - **[USDC on Hedera](https://www.circle.com/multi-chain-usdc/hedera)** — settlement
 - **[Foundry](https://getfoundry.sh)** — contracts and tests
 - **[Next.js](https://nextjs.org)** — frontend
-
+- ** LOVE AND A NEURODIVERGENT SENSE OF JUSTICE ❤️‍🔥**
 ---
 
 ## Team
 
 | Name | Role | Links |
 |---|---|---|
-| Santiago Caprioli | Solo builder | [GitHub](https://github.com/C4P5) |
+| Santiago Caprioli | buildoor | [GitHub](https://github.com/C4P5) |
+| Claude 5 | Orchestrator | (https://www.anthropic.com) |
 
 ---
 
