@@ -1,7 +1,7 @@
 <h1 align="center">TURMOIL</h1>
 
 <p align="center">
-  <strong>Oil pickup sevice + UCO audits for verifiable Biofuel operations, onchain-</strong>
+  <strong>Oil pickup service + UCO audits for verifiable Biofuel operations, onchain.</strong>
 </p>
 
 <p align="center">
@@ -37,16 +37,34 @@ Biodiesel is largely -and preferably- made from **used cooking oils (UCO)**. Eur
 
 The numbers, from the people who investigate this for a living:
 
-| Finding | Source |
-|---|---|
-| **~80%** of UCO the EU imported in 2022 is **suspected** to be mislabelled virgin palm oil | [Transport & Environment](https://www.transportenvironment.org/articles/uco) |
-| **1.8 million tonnes** of fraudulently ISCC-certified POME entered the EU in 2023 | [Maritime Executive](https://maritime-executive.com/article/eu-scrutinizes-fraud-in-certification-of-biofuels) |
-| ISCC's certified volumes **exceed physical production** (March 2025 data) | Same |
-| A live proposal asks the European Commission to **suspend recognition of ISCC** for waste-based biofuels for 2.5 years | Same |
-| ISCC **withdrew or suspended 7 certificates** after a mislabelling investigation; 6 revoked, **3 holders China-based** | [QC Intel](https://www.qcintel.com/biofuels/article/iscc-withdraws-certification-from-uco-supplier-accused-of-non-delivery-33218.html) |
-| The European Commission opened an **anti-dumping investigation** (Dec 2023), plus a probe into Indonesian biodiesel routed via China to evade duties | [Fastmarkets](https://www.fastmarkets.com/insights/ec-confirms-china-eu-waste-biofuel-probe/) |
+### The arithmetic doesn't close
 
-Palm oil and used cooking oil are chemically similar enough that you cannot tell them apart by looking, and largely not by testing either. So the entire market runs on **paperwork** — and the body issuing that paperwork is in enough trouble that regulators are discussing not recognising it any more.
+| Finding | Date | Source |
+|---|---|---|
+| Roughly **2 Mt of POME-oil-based biofuel** reached the European market in 2023 — **more than global production capacity** | Apr 2025 | [Transport & Environment](https://www.transportenvironment.org/articles/uco) |
+| **1.8 million tonnes** of fraudulently ISCC-certified POME entered the EU | 2023 | [Maritime Executive](https://maritime-executive.com/article/eu-scrutinizes-fraud-in-certification-of-biofuels) |
+| ISCC certified volumes **exceed physical production** | Mar 2025 | Same |
+| ISCC issued certification for fuel from a refinery in the UAE that, per BLE satellite imagery, **does not exist**. ISCC suspended the *importer's* certificate — **not the auditor** that approved the non-existent refinery *(as reported by NDR Panorama 3)* | Nov 2025 | [NDR Panorama 3](https://www.ndr.de/fernsehen/sendungen/panorama3/meldungen/betrug-mit-biotreibstoffen-besser-als-drogenhandel,betrug-biodiesel-hvo-100.html) |
+
+### The scale of the incentive
+
+| Finding | Date | Source |
+|---|---|---|
+| Relabelling palm oil as waste earns **$300–565 per tonne**; total profits estimated in the hundreds of millions of euros. A trader interviewed called it **better than drug dealing** | 2023–2025 | Argus Media, via [NDR Panorama 3](https://www.ndr.de/fernsehen/sendungen/panorama3/meldungen/betrug-mit-biotreibstoffen-besser-als-drogenhandel,betrug-biodiesel-hvo-100.html) |
+| **~80% of EU used cooking oil is imported**, ~60% of it from China — a supply chain that begins outside EU jurisdiction | Dec 2024 | [Transport & Environment](https://www.transportenvironment.org/articles/uco) |
+| T&E estimates **20–33%** of imported UCO is **suspected** to be mislabelled virgin palm oil | Nov 2025 – Jun 2026 | Transport & Environment |
+
+### The response so far
+
+| Finding | Date | Source |
+|---|---|---|
+| **26 of 27 EU member states** back a proposed **2.5-year suspension** of ISCC recognition for waste-based biofuels | Mar 2025 – Mar 2026 | ENGINE / Varuna Marine |
+| ISCC **withdrew or suspended 7 certificates** after a mislabelling investigation; 6 revoked, **3 holders China-based** | 2024 | [QC Intel](https://www.qcintel.com/biofuels/article/iscc-withdraws-certification-from-uco-supplier-accused-of-non-delivery-33218.html) |
+| Germany's **BLE linked two companies to certification fraud** | May 2025 | [S&P Global](https://www.spglobal.com/energy/en/news-research/latest-news/crude-oil/050725-german-biofuels-regulator-links-two-companies-to-certification-fraud) |
+| European Commission opened an **anti-dumping investigation**, plus a probe into Indonesian biodiesel routed via China to evade duties | Dec 2023 | [Fastmarkets](https://www.fastmarkets.com/insights/ec-confirms-china-eu-waste-biofuel-probe/) |
+| **11 arrests in Indonesia** — customs officials and executives — over virgin palm oil declared as POME | Feb 2026 | QC Intel |
+
+Palm oil and used cooking oil are chemically similar enough that you cannot reliably tell them apart by looking, and largely not by testing either. So the entire market runs on **paperwork** — and the body issuing that paperwork certified more POME than the planet produces, and a refinery that isn't there.
 
 The fraud is possible because **a certificate is a claim made by one party about oil nobody else saw.**
 
@@ -54,7 +72,7 @@ The fraud is possible because **a certificate is a claim made by one party about
 
 ## The Solution
 
-TURMOIL builds the receipt - Incentivizes small bussinesses, and *ackchyually* collects UCO from reliable sources (instead of, you know, fraud).
+TURMOIL builds the receipt - Incentivizes small businesses, and *ackchyually* collects UCO from reliable sources (instead of, you know, fraud).
 
 **1. Two signatures or no pickup.** A driver arrives to collect a restaurant's used oil, measures it, and shows a QR code on his phone containing the batch hash. The restaurant scans it and signs. Neither party can record a pickup alone, and the countersignature is only possible in the same room.
 
@@ -82,7 +100,7 @@ TURMOIL builds the receipt - Incentivizes small bussinesses, and *ackchyually* c
 
 ### Why This Qualifies
 
-- **A real, documented, unsolved market crime** — Pretty self-exlainatory. Every figure above is sourced and dated.
+- **A real, documented, unsolved market crime** — Pretty self-explanatory. Every figure above is sourced and dated.
 - **ERC-3643, not a hand-rolled NFT.** A truck paying revenue to holders is a security. We issued it on rails built for such — identity registry, compliance module, transfer restrictions — rather than pretending it isn't one. Because that's the right thing to do. 
 - **Hedera-native, not a copy-paste EVM deploy.** Audit sampling uses Hedera's PRNG system contract at `0x169` ([HIP-351](https://hips.hedera.com/hip/hip-351)) — no oracle, no VRF wait.
 - **Gasless for the people who don't want a wallet.** Restaurants sign typed data; they never hold HBAR or send a transaction.
@@ -120,7 +138,7 @@ TURMOIL builds the receipt - Incentivizes small bussinesses, and *ackchyually* c
 
 ## Key Design Decisions
 
-**No middleware.** Everything is EVM contracts on Hedera + Next.js frontend. Business logic that matters lives onchain where anyone can check and audit independantly.
+**No middleware.** Everything is EVM contracts on Hedera + Next.js frontend. Business logic that matters lives onchain where anyone can check and audit independently.
 
 **Restaurants never transact.** Hedera natively supports ECDSA secp256k1 keys, so a Privy embedded wallet signs EIP-712 typed data for a batch. The collector relays both signatures in one call:
 
@@ -159,6 +177,8 @@ P(caught)          ≈ 41.6%
 
 Get caught once and you are fined as though 10% of the load were fake. With the deposit sized at **10% of load value**, that is the entire deposit — a ~41.6% chance of losing everything to gain 5%. The expected value of cheating is negative. That is the whole design.
 
+**Why that threshold matters.** Relabelling palm oil as waste earns $300–565 per tonne, and a trader in the NDR investigation called it better than drug dealing. Deterrence that isn't priced against a number that large is decoration. Every parameter here — sample rate, extrapolation factor, deposit size — exists to keep the expected value negative against *that* payoff, and all three are tunable as it moves.
+
 ---
 
 ## Adversarial Demo
@@ -179,7 +199,9 @@ Most projects demo the happy path. We demo the system refusing to be cheated.
 
 ## Threat Model & Honest Limits
 
-**We cannot chemically distinguish palm oil from used cooking oil.** Hell, neither ISCC can — that is exactly why the fraud works so well. Anyone claiming a supply-chain system that solves this is straight-up making stuff up. The lateral thinking that makes this project viable is: "why would small, medium, or family-owned restaurants lie about this? We're literally paying them for picking up their goop". And there are hundreds of them - all over the world, probably discarding +100L of used oil weekly.  
+**We cannot chemically distinguish palm oil from used cooking oil.** Hell, neither ISCC can — that is exactly why the fraud works so well. Anyone claiming a supply-chain system that solves this is straight-up making stuff up. The lateral thinking that makes this project viable is: "why would small, medium, or family-owned restaurants lie about this? We're literally paying them for picking up their goop". And there are hundreds of them - all over the world, probably discarding +100L of used oil weekly.
+
+Nor is this a problem that diligence alone has solved. A 2023 USDA report suggested Neste may have received fraudulently exported virgin palm oil as UCO at its Singapore refinery. Neste — which runs laboratory analysis on incoming material, supplier vetting, third-party audits and traceability systems — [disputed the finding](https://www.biobased-diesel.com/post/neste-challenges-assertions-in-usda-report-about-receiving-fraudulent-uco-from-china), stating its own analyses did not support the assertion and that the reference was "either a mistake or based on a misunderstanding." Take that at face value and it is *still* the argument for this project: the largest buyer in the sector, with the best testing in the sector, ended up in a public dispute about what it had bought. That is not negligence. It is what happens when provenance rests on paperwork.
 
 What we actually change: the origin claim becomes **two-sided and mass-balanced**. Every litre traces to a named restaurant that signed with its own key, and the totals cannot exceed what the plant received. Faking this at the scale the EU is currently seeing would mean fabricating thousands of restaurant counterparties, each signing independently, each surviving a random post-hoc challenge. That is a different order of difficulty from buying a certificate. 
 
@@ -187,7 +209,7 @@ Other things this system does **not** do (yet):
 
 - It does not make the oil itself testable.
 - It does not replace an accredited certification body. It produces the evidence one would need. Exploring the feasibility of adding this to the platform is a top priority PR
-- It won't stop plants from lying about what they received — but the plant is also part the party paying, so understating costs it money, and the drivers' signed batches contradict it. An extraodinary dumb thing to do in my most honest opinion  
+- It won't stop plants from lying about what they received — but the plant is also the party paying, so understating costs it money, and the drivers' signed batches contradict it. An extraordinarily dumb thing to do, in my most honest opinion.
 - System assumes restaurants are repeat counterparties. A one-time supplier has weaker deterrence.
 
 ---
@@ -299,7 +321,8 @@ Design decisions were adversarial, not generated: the architecture below survive
 - **[USDC on Hedera](https://www.circle.com/multi-chain-usdc/hedera)** — settlement
 - **[Foundry](https://getfoundry.sh)** — contracts and tests
 - **[Next.js](https://nextjs.org)** — frontend
-- ** LOVE AND A NEURODIVERGENT SENSE OF JUSTICE ❤️‍🔥**
+- **LOVE AND A NEURODIVERGENT SENSE OF JUSTICE ❤️‍🔥**
+
 ---
 
 ## Team
@@ -307,14 +330,18 @@ Design decisions were adversarial, not generated: the architecture below survive
 | Name | Role | Links |
 |---|---|---|
 | Santiago Caprioli | buildoor | [GitHub](https://github.com/C4P5) |
-| Claude 5 | Orchestrator | (https://www.anthropic.com) |
+| Claude Opus 5 | Orchestrator | [Anthropic](https://www.anthropic.com) |
 
 ---
 
 ## References
 
 - [Transport & Environment — *UCO: The Certified Unknown*](https://www.transportenvironment.org/articles/uco)
+- [NDR Panorama 3 — *Betrug mit Biotreibstoffen: "Besser als Drogenhandel"*](https://www.ndr.de/fernsehen/sendungen/panorama3/meldungen/betrug-mit-biotreibstoffen-besser-als-drogenhandel,betrug-biodiesel-hvo-100.html) (German public broadcaster)
+- [OCCRP — *How Biofuels Scams Have Undermined A Flagship EU Climate Policy*](https://www.occrp.org/en/investigation/how-biofuels-scams-have-undermined-a-flagship-eu-climate-policy)
+- [S&P Global — *German biofuels regulator links two companies to certification fraud*](https://www.spglobal.com/energy/en/news-research/latest-news/crude-oil/050725-german-biofuels-regulator-links-two-companies-to-certification-fraud)
 - [EU scrutinizes fraud in certification of biofuels](https://maritime-executive.com/article/eu-scrutinizes-fraud-in-certification-of-biofuels)
+- [Neste's response to the USDA report](https://www.biobased-diesel.com/post/neste-challenges-assertions-in-usda-report-about-receiving-fraudulent-uco-from-china)
 - [ISCC withdraws certification from UCO supplier](https://www.qcintel.com/biofuels/article/iscc-withdraws-certification-from-uco-supplier-accused-of-non-delivery-33218.html)
 - [EC confirms China–EU waste biofuel probe](https://www.fastmarkets.com/insights/ec-confirms-china-eu-waste-biofuel-probe/)
 - [HIP-351 — UtilPrngTransaction](https://hips.hedera.com/hip/hip-351)
@@ -330,5 +357,5 @@ MIT — see [LICENSE](./LICENSE).
 ---
 
 <p align="center">
-  <strong>Eighty percent of Europe's "used cooking oil" is suspected to be virgin palm oil.<br/>We make the other twenty percent provable — from the fryer.</strong>
+  <strong>Europe burned more POME-based biofuel in 2023 than the planet can produce.<br/>We make used cooking oil provable — from the fryer.</strong>
 </p>
