@@ -7,3 +7,6 @@ libs = ["lib"]
 
 [fuzz]
 runs = 2000
+
+[rpc_endpoints]
+hedera_testnet = "${HEDERA_RPC_URL}"
