@@ -134,6 +134,14 @@ export const TURMOIL_ABI = [
     inputs: [],
     outputs: [{ name: "", type: "uint16" }],
   },
+  // The errors attest() can revert with. viem can only name a revert it can find
+  // in the ABI: without these, a failed pickup shows the restaurant owner a raw
+  // selector like 0x983d6bdc — which is exactly what it did on Hedera testnet.
+  { type: "error", name: "Expired", inputs: [] },
+  { type: "error", name: "NotRegistered", inputs: [] },
+  { type: "error", name: "SelfDeal", inputs: [] },
+  { type: "error", name: "BadSignature", inputs: [] },
+  { type: "error", name: "UnderBonded", inputs: [] },
 ] as const;
 
 /** USDC is 6 decimals. Formatting it as 18 is how demos show someone $0.000000000048. */

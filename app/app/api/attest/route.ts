@@ -1,8 +1,34 @@
 import { NextResponse } from "next/server";
-import { createWalletClient, http, publicActions } from "viem";
+import { BaseError, ContractFunctionRevertedError, createWalletClient, http, publicActions } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { hederaTestnet } from "@/lib/chain";
 import { TURMOIL_ABI, TURMOIL_ADDRESS } from "@/lib/turmoil";
+
+/**
+ * What each revert means to the person holding the phone. A restaurant owner
+ * cannot act on "0x983d6bdc", and neither can anyone watching a demo.
+ */
+const REVERT_MESSAGES: Record<string, string> = {
+  Expired: "This request expired. Ask the driver for a new QR.",
+  NotRegistered: "This restaurant or collector is not registered yet.",
+  SelfDeal: "Restaurant and collector cannot be the same account.",
+  BadSignature: "Signature rejected — this pickup was already recorded, or the QR was altered.",
+  UnderBonded: "The collector's bond does not cover this lot. They must top it up before collecting.",
+};
+
+/** Names the revert when the ABI knows it; falls back to the raw message otherwise. */
+function explain(e: unknown): string {
+  if (e instanceof BaseError) {
+    const revert = e.walk((err) => err instanceof ContractFunctionRevertedError);
+    if (revert instanceof ContractFunctionRevertedError) {
+      const name = revert.data?.errorName;
+      // A named error with no entry here is still better than a selector.
+      if (name) return REVERT_MESSAGES[name] ?? `Rejected by the contract: ${name}.`;
+    }
+    return e.shortMessage;
+  }
+  return e instanceof Error ? e.message : String(e);
+}
 
 /**
  * Relayer. Submits a batch that both parties have already signed.
@@ -48,7 +74,6 @@ export async function POST(req: Request) {
     const txHash = await client.writeContract(request);
     return NextResponse.json({ txHash });
   } catch (e) {
-    const message = e instanceof Error ? e.message : String(e);
-    return NextResponse.json({ error: message }, { status: 400 });
+    return NextResponse.json({ error: explain(e) }, { status: 400 });
   }
 }
