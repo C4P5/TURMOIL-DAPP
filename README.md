@@ -280,14 +280,23 @@ What the contract enforces: *every litre carries signatures from two distinct re
 | `sealLot()` | Closes the collector's open lot so the audit sample can be drawn against a fixed set |
 | `settleLot()` | Plant reports what arrived; enforces `Σ attested ≤ received + tolerance` and charges any gap to the collector's deposit |
 | `drawAudit()` | Samples `sampleBps` of the lot's batches using Hedera's PRNG at `0x169` ([HIP-351](https://hips.hedera.com/hip/hip-351)) |
-| `flagAudit()` | A sampled batch failed confirmation — fines at the sample rate, so one catch costs the whole deposit |
-| `postDeposit()` | Collector bond, sized at 10% of lot value |
+| `flagAudit()` | A sampled batch went unanswered — burns the collector's **entire** bond. Refused if the restaurant confirmed, and refused until the challenge window has closed, so the operator cannot fine on sight |
+| `postDeposit()` | Collector bond, sized at `depositBps` of lot value — **currently 50%**, and `attest()` refuses a pickup that the bond does not cover |
 
 Every economic parameter — price per litre, tolerance, sample rate, deposit size — is owner-tunable, because the payoff they have to beat moves.
 
-**Truck share:** a separate ERC-3643 issued through Hedera's Asset Tokenization Studio, which also handles distributions to holders. `Turmoil.sol` does not reference it. 🚧
+**Truck share:** a separate ERC-3643 issued through Hedera's Asset Tokenization Studio, which also handles distributions to holders. `Turmoil.sol` does not reference it. 🚧 *not yet issued*
 
-> 🚧 **Deployed addresses and verified HashScan links land with the testnet deploy.**
+### Deployed — Hedera testnet (chain 296)
+
+| | |
+|---|---|
+| `Turmoil.sol` | [`0.0.10433657`](https://hashscan.io/testnet/contract/0.0.10433657) · `0x18aaDF40EeeA61666Cc49B5Cc838632b3EbCfee2` |
+| Settlement token | USDC [`0.0.429274`](https://hashscan.io/testnet/token/0.0.429274) · ERC-20 facade `0x0000000000000000000000000000000000068cDa` |
+| EIP-712 domain | `name: "TURMOIL"`, `version: "1"`, `chainId: 296`, `verifyingContract:` the address above |
+| Live parameters | `pricePerLitre 248000` ($0.248/L) · `depositBps 5000` · `sampleBps 3000` · `toleranceBps 200` |
+
+Every value above is read back **from the deployed contract**, not copied from the deploy script.
 
 ---
 
@@ -305,11 +314,15 @@ Every economic parameter — price per litre, tolerance, sample rate, deposit si
 
 | Service | Purpose | ID / Address |
 |---|---|---|
-| Smart Contract Service | All protocol contracts | 🚧 |
-| PRNG system contract | Random audit sampling (HIP-351) | `0x169` |
-| HTS — USDC | Restaurant payouts and distributions | `0.0.429274` (testnet, per Circle — 🚧 to verify on HashScan) |
-| Asset Tokenization Studio | ERC-3643 truck token issuance | 🚧 |
-| Mirror Node | Public reads for the frontend | `testnet.mirrornode.hedera.com` |
+| Smart Contract Service | `Turmoil.sol` — attestation, mass balance, audit slashing | [`0.0.10433657`](https://hashscan.io/testnet/contract/0.0.10433657) |
+| PRNG system contract | Audit sampling drawn **after** the lot seals (HIP-351) | `0x169` — verified live, returns a non-zero seed |
+| HTS — USDC | Restaurant payouts and collector bonds | [`0.0.429274`](https://hashscan.io/testnet/token/0.0.429274) — verified `FUNGIBLE_COMMON`, 6 decimals, no KYC key |
+| HTS auto-association | Restaurants receive USDC with **no association transaction** | `maxAutomaticTokenAssociations = -1` (HIP-904), on both the contract and the embedded wallet |
+| Asset Tokenization Studio | ERC-3643 truck token issuance | 🚧 not yet issued |
+| JSON-RPC relay | Frontend contract reads, relayed `attest` writes | `testnet.hashio.io/api` |
+| Mirror Node | Deployment, account and token verification during the build | `testnet.mirrornode.hedera.com` |
+
+The auto-association row is load-bearing, not trivia: without HIP-904 defaults a restaurant would have to sign an association transaction before it could be paid, and the "never sends a transaction" claim above would be false.
 
 ---
 
@@ -317,7 +330,16 @@ Every economic parameter — price per litre, tolerance, sample rate, deposit si
 
 Next.js with the Privy React SDK. Email login creates an embedded ECDSA wallet; the restaurant signs EIP-712 typed data and never sends a transaction.
 
-> 🚧 **WIP — screens table, live URL, data sources.**
+| Route | Who | What happens |
+|---|---|---|
+| `/` | Collector | Enter litres, sign as collector, render a QR carrying the batch and that signature |
+| `/sign` | Restaurant | Email login, sees the litres and the exact USDC amount read live from the contract, signs. No wallet, no HBAR, no transaction |
+| `/lot/[id]` | Anyone | Provenance receipt — every batch in a lot, the plant's received weight, and the audit seed once drawn |
+| `/api/attest` | Relayer | Submits a batch both parties already signed. Holds no authority: `attest()` verifies both signatures onchain, so a leaked relayer key can forge nothing and replay nothing |
+
+**Data sources.** Every figure on screen is read from `Turmoil.sol` through the JSON-RPC relay — `pricePerLitre` included, because it is owner-tunable state and hardcoding it would let the consent screen misstate what someone is agreeing to. Nothing is stored off-chain.
+
+🚧 *No public URL yet — runs locally against Hedera testnet.*
 
 ---
 
@@ -325,7 +347,53 @@ Next.js with the Privy React SDK. Email login creates an embedded ECDSA wallet; 
 
 ## Quick Start
 
-> 🚧 **WIP — lands with the first working scaffold.**
+**Needs:** [Foundry](https://getfoundry.sh), Node 20+, a Hedera testnet account from [portal.hedera.com](https://portal.hedera.com) (**ECDSA**, not ED25519), and a [Privy](https://dashboard.privy.io) app id.
+
+### Contracts
+
+```bash
+cd contracts
+forge test                       # 22 tests, fuzzed at 2000 runs
+
+cp .env.example .env             # then add PRIVATE_KEY
+set -a && source .env && set +a
+
+# Simulate against live Hedera state first — no key, no transaction:
+forge script script/Deploy.s.sol --tc Deploy \
+  --rpc-url hedera_testnet --sender <your-address>
+
+# Then broadcast:
+forge script script/Deploy.s.sol --tc Deploy \
+  --rpc-url hedera_testnet --private-key "$PRIVATE_KEY" --broadcast
+```
+
+The deploy prints the contract address **and the full EIP-712 domain**. Copy those into the app rather than typing them: if `chainId` or `verifyingContract` drifts by one character, every signature recovers to a stranger and `attest()` reverts with `BadSignature` — indistinguishable from forgery.
+
+Leaving `SETTLEMENT_TOKEN` unset deploys a 6-decimal `DemoUSDC` and mints an escrow float, which is what you want against a local `anvil`.
+
+### Frontend
+
+```bash
+cd app
+npm install
+cp .env.example .env.local       # add NEXT_PUBLIC_PRIVY_APP_ID and the deployed address
+npm run dev                      # localhost:3000
+```
+
+`next dev` reads the environment only at boot — restart it after editing `.env.local`, or the app will keep serving the previous configuration. If `NEXT_PUBLIC_TURMOIL_ADDRESS` is unset the app says so in a banner instead of failing silently.
+
+### Registering counterparties
+
+Only registered addresses can attest. As the contract owner:
+
+```bash
+cast send <contract> "setCollector(address,bool)" <collector> true \
+  --rpc-url "$HEDERA_RPC_URL" --private-key "$PRIVATE_KEY"
+cast send <contract> "setRestaurant(address,bool)" <restaurant> true \
+  --rpc-url "$HEDERA_RPC_URL" --private-key "$PRIVATE_KEY"
+```
+
+A restaurant's embedded wallet is not a Hedera account until it holds something. Send it a dust HBAR transfer once at signup; the account is then created with unlimited auto-association and can receive USDC without ever signing an association transaction.
 
 ---
 
@@ -333,12 +401,21 @@ Next.js with the Privy React SDK. Email login creates an embedded ECDSA wallet; 
 
 ```
 TURMOIL-DAPP/
-├── contracts/        # Foundry — Turmoil.sol + 10 tests    ✅
-├── app/              # Next.js + Privy React SDK           🚧
-├── agent/            # Reconciliation / anomaly flagger    🚧
-├── docs/             # Architecture, threat model, pitch   🚧
+├── contracts/
+│   ├── src/Turmoil.sol         # the whole protocol, one contract     ✅
+│   ├── test/Turmoil.t.sol      # 22 tests, fuzz at 2000 runs          ✅
+│   └── script/Deploy.s.sol     # anvil or Hedera, prints the domain   ✅
+├── app/
+│   ├── app/page.tsx            # collector: measure, sign, show QR    ✅
+│   ├── app/sign/page.tsx       # restaurant: email login, sign        ✅
+│   ├── app/lot/[id]/page.tsx   # provenance receipt                   ✅
+│   ├── app/api/attest/route.ts # relayer                              ✅
+│   └── lib/turmoil.ts          # ABI + EIP-712 domain, shared         ✅
+├── LICENSE
 └── README.md
 ```
+
+**Not built, and deliberately so.** The anomaly flagger described in the trust model reads events and scores risk; enforcement lives in the contract, not in it, which is why it is the last thing on the list rather than the first. There is no `docs/` — the architecture, threat model and honest limits are all in this file.
 
 ---
 
@@ -350,7 +427,16 @@ TURMOIL-DAPP/
 
 ## Cost Analysis
 
-> 🚧 **WIP — gas per attestation, per lot settlement, and per audit round, measured on testnet.**
+Measured on Hedera testnet, chain 296, at an observed gas price of ~2,240–2,260 gwei. Foundry labels the total "ETH"; it is HBAR.
+
+| Operation | Gas | Cost |
+|---|---|---|
+| Deploy `Turmoil.sol` | 5,194,465 | **~4.28 ℏ** (measured from the balance delta, against an 11.6 ℏ estimate) |
+| Materialise a restaurant account (dust HBAR) | 607,859 | high for a transfer because it *creates* the account — a one-time cost per restaurant |
+| `setCollector` + `setRestaurant` + that transfer | — | ~1.75 ℏ for all three |
+| `attest` / `settleLot` / `drawAudit` | 🚧 | 🚧 pending the funded end-to-end run |
+
+**The restaurant's cost is zero, and that is a design outcome rather than a subsidy.** They sign typed data; the collector's relayer pays every fee. The collector is the party earning the margin, so the party paying the gas is the party being paid — which is also why the relayer key belongs on their device in production, not on our server.
 
 ---
 
@@ -364,14 +450,17 @@ This project is built solo, with heavy use of **Claude Opus 5** (Anthropic) via 
 | Market research and source verification | Direction, judgment calls | Search, fetch, fact-checking against primary sources |
 | Architecture and mechanism design | Every decision, every trade-off accepted or rejected | Proposed options, challenged assumptions, found the `0x169` and ERC-3643 paths |
 | Killed ideas (Guardian, carbon credits, native token, ENS, Etc) | Final calls | Verification that surfaced why each failed |
-| Smart contracts | 🚧 | 🚧 |
-| Frontend | 🚧 | 🚧 |
-| Tests | 🚧 | 🚧 |
+| Smart contracts | Mechanism design, every economic parameter, and the demand that the deterrence arithmetic be *computed* rather than asserted | Solidity drafting; an adversarial review that returned BLOCK with eight executed proof-of-concept tests |
+| Tests | Which attacks must be provably impossible for the design to mean anything | Foundry test authoring, fuzz-testing setup |
+| Frontend | Screen-by-screen intent, the UX calls, review | React/Next drafting, EIP-712 wiring, Privy and Hedera integration |
+| Hedera integration and deployment | Credentials, go/no-go calls, and the decision to spike before building | Spike design and execution, mirror-node verification, deploy and onchain checks |
 | This README | Review and corrections | Drafting |
 
 Design decisions were adversarial, not generated: the architecture below survived several rounds in which proposed features were verified against primary sources and cut when they failed. Hedera's Guardian software, dMRV system with Gold Standard's methodology implementation for carbon credits creation, a native payment token, a Biofuel petrol station, a Biofuel refinery RWA token, and a token floor price were all removed for documented reasons.
 
-> 🚧 **WIP — updated per component as code lands.**
+**The most useful thing to know about this split is where it failed.** The worst error in this project was the AI's, and it survived until something adversarially tested it. The headline claim — *"the expected value of cheating is negative"* — was published while being false: the old fine was an unbiased extrapolation and therefore zero-EV by construction, and at the demo's own configuration cheating paid **+0.84% of lot value**. The 41.6% catch probability underneath it had been derived correctly; the conclusion it supported was never computed at all. A correct sub-calculation inside an unchecked claim.
+
+It was caught by running a review that tried to break the contract, not by reading the contract. The same pass found a `depositBps` that was declared, assigned and never read — making every slash cap out at nothing — and a once-only audit guard keyed on `seed != 0`, which is dead off-Hedera because that is exactly what `block.prevrandao` returns there. The deterrence table in [Why cheating loses money](#) is the corrected one, and it is corrected because it was finally calculated.
 
 ---
 
