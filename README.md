@@ -291,12 +291,38 @@ Every economic parameter — price per litre, tolerance, sample rate, deposit si
 
 | | |
 |---|---|
-| `Turmoil.sol` | [`0.0.10433657`](https://hashscan.io/testnet/contract/0.0.10433657) · `0x18aaDF40EeeA61666Cc49B5Cc838632b3EbCfee2` |
-| Settlement token | USDC [`0.0.429274`](https://hashscan.io/testnet/token/0.0.429274) · ERC-20 facade `0x0000000000000000000000000000000000068cDa` |
+| `Turmoil.sol` | [`0.0.10448308`](https://hashscan.io/testnet/contract/0.0.10448308) · `0x89440484d81ab086616586aa3922619d579c6a7c` |
+| Settlement token | `DemoUSDC` [`0.0.10448306`](https://hashscan.io/testnet/contract/0.0.10448306) · `0xDb8b588021B1926857B183cf59830B3a7c5415b1` — symbol `USDC`, **6 decimals** |
 | EIP-712 domain | `name: "TURMOIL"`, `version: "1"`, `chainId: 296`, `verifyingContract:` the address above |
 | Live parameters | `pricePerLitre 248000` ($0.248/L) · `depositBps 5000` · `sampleBps 3000` · `toleranceBps 200` |
 
 Every value above is read back **from the deployed contract**, not copied from the deploy script.
+
+### Why the demo does not settle in real USDC
+
+It was supposed to. Circle's USDC on Hedera testnet is [`0.0.429274`](https://hashscan.io/testnet/token/0.0.429274) and we verified it properly — `FUNGIBLE_COMMON`, 6 decimals, no KYC key, ERC-20 facade answering at `0x…068cDa`. The contract was deployed bound to it, and `payToken()` returned that address.
+
+**We could not obtain any.** Circle's faucet lists Hedera Testnet and reports success; nothing arrives. Two attempts, hours apart, delivered zero — the mirror node shows no inbound transfer and no token association ever created on the receiving account, while the faucet's own rate limiter counted both requests against the quota. Other accounts were receiving 20-USDC drips from it at the same time, and other developers report the same silent failure. The receiving side was provably fine: `deleted: false`, `maxAutomaticTokenAssociations: -1`, `receiverSigRequired: false`.
+
+There is no second source. SaucerSwap's testnet has 592 pools and **not one of them holds `0.0.429274`** — `getPair(WHBAR, USDC)` returns the zero address.
+
+So the demo settles against a 6-decimal `DemoUSDC` deployed by the same script. **This changes no logic.** `payToken` is `immutable` and set from the constructor; the contract never assumes anything about the token beyond `SafeERC20` and six decimals. Setting `SETTLEMENT_TOKEN` to `0x…068cDa` binds real USDC and nothing else changes — that is exactly how the first deployment ran.
+
+The upside was unplanned: a 20-USDC drip every two hours would have capped the demo at 80 litres. A 100,000 USDC float lets the demo run at honest volumes.
+
+### Proven onchain, not asserted
+
+| Claim | How it was verified |
+|---|---|
+| The deployed contract **is** the committed source | Runtime bytecode compared byte-for-byte against the local build. All 30 differing runs are constructor-set immutables — `payToken`, the cached `chainId` (`0x128` = 296), the contract's own address, and the EIP-712 name and version. Everything else is identical |
+| A restaurant is paid without ever transacting | Balance `0 → 4,960,000` (**$4.96** for 20 L), contract float `100,500.00 → 100,495.04`, `batchCount 1` |
+| A Privy signature verifies inside a Hedera contract | `attest()` passed both `ECDSA.recover` checks against the registered addresses |
+| A restaurant needs no token association | Contract and embedded wallet both carry `maxAutomaticTokenAssociations = -1`; no association transaction exists on either |
+| The bond gate actually fires | An unbonded collector's attestation reverted with `UnderBonded()` before any payout |
+| Audit sampling really comes from Hedera | `drawAudit` on lot 0 stored seed `0xa5df6581…b387df`; lot 1 drew a different one. Both from `0x169`, both after the lot sealed |
+| Mass balance is enforced arithmetically | 20 L attested against an 18 L plant receipt → allowed `(18×10200)/10000 = 18`, shortfall 2 L, **496,000 slashed** from the bond. The plant address stored is the recovered signer, not a field we set |
+| An unanswered audit costs the whole bond | Batch 0 went unconfirmed past the challenge window → `flagAudit` burned `deposit` **500.504 → 0** |
+| **A confirmed batch cannot be flagged** | Batch 1 was sampled and confirmed by its restaurant's own signature; `flagAudit` then reverted `AlreadyConfirmed` (`0x5f8a9c0b`) and the bond stayed whole. This is the leg that makes the restaurants a check on us rather than the other way round |
 
 ---
 
@@ -314,9 +340,10 @@ Every value above is read back **from the deployed contract**, not copied from t
 
 | Service | Purpose | ID / Address |
 |---|---|---|
-| Smart Contract Service | `Turmoil.sol` — attestation, mass balance, audit slashing | [`0.0.10433657`](https://hashscan.io/testnet/contract/0.0.10433657) |
+| Smart Contract Service | `Turmoil.sol` — attestation, mass balance, audit slashing | [`0.0.10448308`](https://hashscan.io/testnet/contract/0.0.10448308) |
 | PRNG system contract | Audit sampling drawn **after** the lot seals (HIP-351) | `0x169` — verified live, returns a non-zero seed |
-| HTS — USDC | Restaurant payouts and collector bonds | [`0.0.429274`](https://hashscan.io/testnet/token/0.0.429274) — verified `FUNGIBLE_COMMON`, 6 decimals, no KYC key |
+| HTS — USDC | The token the contract is *designed* to settle in; verified `FUNGIBLE_COMMON`, 6 decimals, no KYC key, and bound by an earlier deployment | [`0.0.429274`](https://hashscan.io/testnet/token/0.0.429274) — unobtainable on testnet, see above |
+| Settlement in this demo | `DemoUSDC`, same 6 decimals, deployed by the same script | [`0.0.10448306`](https://hashscan.io/testnet/contract/0.0.10448306) |
 | HTS auto-association | Restaurants receive USDC with **no association transaction** | `maxAutomaticTokenAssociations = -1` (HIP-904), on both the contract and the embedded wallet |
 | Asset Tokenization Studio | ERC-3643 truck token issuance | 🚧 not yet issued |
 | JSON-RPC relay | Frontend contract reads, relayed `attest` writes | `testnet.hashio.io/api` |
@@ -429,14 +456,20 @@ TURMOIL-DAPP/
 
 Measured on Hedera testnet, chain 296, at an observed gas price of ~2,240–2,260 gwei. Foundry labels the total "ETH"; it is HBAR.
 
-| Operation | Gas | Cost |
+| Operation | Gas | Note |
 |---|---|---|
-| Deploy `Turmoil.sol` | 5,194,465 | **~4.28 ℏ** (measured from the balance delta, against an 11.6 ℏ estimate) |
-| Materialise a restaurant account (dust HBAR) | 607,859 | high for a transfer because it *creates* the account — a one-time cost per restaurant |
-| `setCollector` + `setRestaurant` + that transfer | — | ~1.75 ℏ for all three |
-| `attest` / `settleLot` / `drawAudit` | 🚧 | 🚧 pending the funded end-to-end run |
+| Deploy `Turmoil.sol` | 5,194,465 | **~4.28 ℏ** measured from the balance delta, against an 11.6 ℏ estimate |
+| `attest()` | **274,868** | two signature recoveries, a batch write and a USDC transfer — the only cost in the pickup loop, and the collector pays it |
+| `drawAudit()` | **110,138** | includes the `0x169` system-contract call and partial Fisher-Yates over the lot |
+| `settleLot()` | **81,135** | plant signature recovery, mass-balance check, slash |
+| `confirmBatch()` | **40,449** | the restaurant's defence — relayed, so the restaurant pays nothing for it |
+| `flagAudit()` | **44,959** | burns the entire bond for under a sixth of what recording a pickup costs |
+| Materialise a restaurant account (dust HBAR) | 607,859 | high for a transfer because it *creates* the account — one-time, per restaurant |
 
 **The restaurant's cost is zero, and that is a design outcome rather than a subsidy.** They sign typed data; the collector's relayer pays every fee. The collector is the party earning the margin, so the party paying the gas is the party being paid — which is also why the relayer key belongs on their device in production, not on our server.
+
+Note the shape of it: enforcement is cheap and collection is not. `flagAudit` and `confirmBatch` both cost under a sixth of `attest` — the two operations that make fraud unprofitable are the least expensive writes in the system.
+
 
 ---
 
