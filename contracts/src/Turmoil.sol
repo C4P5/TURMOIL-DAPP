@@ -33,8 +33,15 @@ contract Turmoil is EIP712, Ownable, ReentrancyGuard {
     ///      floor on the sample size, not a percentage of it.
     uint256 public constant MIN_SAMPLE = 3;
 
+    /// @notice How long a sampled restaurant has to confirm before the collector can
+    ///         be flagged. Without a window the operator could flag a batch before the
+    ///         restaurant ever had a chance to answer, which would make the whole
+    ///         challenge decorative.
+    uint64 public challengeWindow = 3 days;
+
     mapping(address => bool) public isRestaurant;
     mapping(address => bool) public isCollector;
+    mapping(address => bool) public isPlant;
     mapping(address => uint256) public deposit; // collector => posted bond
     mapping(address => uint256) public nonces; // restaurant => next batch nonce
 
@@ -45,12 +52,19 @@ contract Turmoil is EIP712, Ownable, ReentrancyGuard {
         uint64 lotId;
         bool audited;
         bool failed;
+        /// @dev Set by the restaurant's own signature, not by the operator.
+        bool confirmed;
     }
 
     struct Lot {
         address collector;
         uint64 attestedLitres;
         uint64 receivedLitres;
+        /// @dev The plant that signed for the received weight. Recorded so the figure
+        ///      the mass balance is checked against is attributable to a counterparty
+        ///      rather than to whoever happens to own this contract.
+        address plant;
+        uint64 drawnAt;
         bool isSealed;
         bool settled;
         /// @dev Explicit flag rather than `seed != 0`. Zero is a legal seed — and it is
@@ -68,11 +82,17 @@ contract Turmoil is EIP712, Ownable, ReentrancyGuard {
     bytes32 private constant BATCH_TYPEHASH =
         keccak256("Batch(address restaurant,address collector,uint64 litres,uint256 nonce,uint256 deadline)");
 
+    bytes32 private constant RECEIPT_TYPEHASH =
+        keccak256("Receipt(uint256 lotId,uint64 receivedLitres,uint256 deadline)");
+
+    bytes32 private constant CONFIRM_TYPEHASH = keccak256("Confirm(uint256 batchId,uint256 deadline)");
+
     event Attested(uint256 indexed batchId, uint256 indexed lotId, address restaurant, uint64 litres, uint256 paid);
     event LotSealed(uint256 indexed lotId, uint64 attestedLitres);
     event LotSettled(uint256 indexed lotId, uint64 receivedLitres, uint256 slashed);
     event AuditDrawn(uint256 indexed lotId, uint256 seed, uint256[] sampled);
     event AuditFailed(uint256 indexed batchId, uint256 fine);
+    event BatchConfirmed(uint256 indexed batchId, address restaurant);
     event DepositChanged(address indexed collector, uint256 balance);
 
     error NotRegistered();
@@ -84,6 +104,9 @@ contract Turmoil is EIP712, Ownable, ReentrancyGuard {
     error SelfDeal();
     error UnderBonded();
     error AlreadyDrawn();
+    error NotSampled();
+    error AlreadyConfirmed();
+    error ChallengeOpen();
 
     constructor(IERC20 token, uint256 pricePerLitre_) EIP712("TURMOIL", "1") Ownable(msg.sender) {
         payToken = token;
@@ -98,6 +121,14 @@ contract Turmoil is EIP712, Ownable, ReentrancyGuard {
 
     function setCollector(address who, bool ok) external onlyOwner {
         isCollector[who] = ok;
+    }
+
+    function setPlant(address who, bool ok) external onlyOwner {
+        isPlant[who] = ok;
+    }
+
+    function setChallengeWindow(uint64 seconds_) external onlyOwner {
+        challengeWindow = seconds_;
     }
 
     function setParams(uint256 price_, uint16 tolerance_, uint16 sample_, uint16 depositBps_) external onlyOwner {
@@ -148,9 +179,21 @@ contract Turmoil is EIP712, Ownable, ReentrancyGuard {
 
         uint256 lotId = _openLot(collector);
         batchId = batches.length;
-        // casting to 'uint64' is safe because lotId only ever grows by one per lot
-        // forge-lint: disable-next-line(unsafe-typecast)
-        batches.push(Batch(restaurant, collector, litres, uint64(lotId), false, false));
+        // Named fields, not positional: adding a field to the struct should be a
+        // compile error here, not a silent shift of every value after it.
+        batches.push(
+            Batch({
+                restaurant: restaurant,
+                collector: collector,
+                litres: litres,
+                // casting to 'uint64' is safe because lotId only ever grows by one per lot
+                // forge-lint: disable-next-line(unsafe-typecast)
+                lotId: uint64(lotId),
+                audited: false,
+                failed: false,
+                confirmed: false
+            })
+        );
         _lotBatches[lotId].push(batchId);
         lots[lotId].attestedLitres += litres;
 
@@ -172,7 +215,10 @@ contract Turmoil is EIP712, Ownable, ReentrancyGuard {
         uint256 marker = openLotOf[collector];
         if (marker != 0) return marker - 1;
         lotId = lots.length;
-        lots.push(Lot(collector, 0, 0, false, false, false, 0));
+        // Push empty and set the one non-zero field. Nothing to keep in sync when the
+        // struct grows.
+        lots.push();
+        lots[lotId].collector = collector;
         openLotOf[collector] = lotId + 1;
     }
 
@@ -199,16 +245,31 @@ contract Turmoil is EIP712, Ownable, ReentrancyGuard {
         emit LotSealed(lotId, lots[lotId].attestedLitres);
     }
 
-    /// @notice The plant reports what physically arrived. The sum of attested
+    /// @notice The plant signs for what physically arrived. The sum of attested
     ///         batches may not exceed it beyond tolerance; the gap is slashed from
-    ///         the collector's deposit, never from investor funds.
-    function settleLot(uint256 lotId, uint64 receivedLitres) external onlyOwner {
+    ///         the collector's bond, never from investor funds.
+    ///
+    /// The weight is a SIGNED figure from a registered plant, not an argument the
+    /// operator supplies. Without that, the party running the mass balance also
+    /// chooses the number it is checked against — which is the ISCC failure this
+    /// project exists to attack, rebuilt with a nicer database.
+    function settleLot(uint256 lotId, uint64 receivedLitres, uint256 deadline, bytes calldata sigPlant)
+        external
+        onlyOwner
+    {
         Lot storage lot = lots[lotId];
         // Distinct errors: an unsealed lot is not the same problem as a settled one,
         // and conflating them sent a caller looking in the wrong place.
         if (!lot.isSealed) revert LotNotReady();
         if (lot.settled) revert LotClosed();
+        if (block.timestamp > deadline) revert Expired();
 
+        address plant = ECDSA.recover(
+            _hashTypedDataV4(keccak256(abi.encode(RECEIPT_TYPEHASH, lotId, receivedLitres, deadline))), sigPlant
+        );
+        if (!isPlant[plant]) revert NotRegistered();
+
+        lot.plant = plant;
         lot.receivedLitres = receivedLitres;
         lot.settled = true;
 
@@ -243,6 +304,7 @@ contract Turmoil is EIP712, Ownable, ReentrancyGuard {
         uint256 seed = _seed();
         lot.seed = seed;
         lot.drawn = true;
+        lot.drawnAt = uint64(block.timestamp);
 
         // Partial Fisher-Yates over a memory copy: sampling WITHOUT replacement, so
         // k draws really do cover k distinct batches. With replacement, a 3-of-3 draw
@@ -279,9 +341,37 @@ contract Turmoil is EIP712, Ownable, ReentrancyGuard {
     /// bond above any theft the mass-balance check would let through.
     function flagAudit(uint256 batchId) external onlyOwner {
         Batch storage b = batches[batchId];
-        require(b.audited && !b.failed, "not sampled");
+        if (!b.audited || b.failed) revert NotSampled();
+        // A restaurant that answered cannot be flagged. This is what makes the
+        // challenge a defence rather than a formality.
+        if (b.confirmed) revert AlreadyConfirmed();
+        // And it must have had time to answer. Flagging the instant the sample is
+        // drawn would let the operator fine anyone it liked.
+        if (block.timestamp <= lots[b.lotId].drawnAt + challengeWindow) revert ChallengeOpen();
+
         b.failed = true;
         emit AuditFailed(batchId, _slash(b.collector, type(uint256).max));
+    }
+
+    /// @notice A sampled restaurant confirms the pickup really happened, with its own
+    ///         signature. Gasless: anyone may relay it, exactly like `attest`.
+    ///
+    /// This is the leg that makes "the restaurants are the check on TURMOIL" true.
+    /// Before it existed, `flagAudit` was an unsigned assertion by the operator and a
+    /// restaurant could neither prove it had confirmed nor dispute a false flag.
+    function confirmBatch(uint256 batchId, uint256 deadline, bytes calldata sigRestaurant) external {
+        if (block.timestamp > deadline) revert Expired();
+        Batch storage b = batches[batchId];
+        if (!b.audited) revert NotSampled();
+        if (b.confirmed) revert AlreadyConfirmed();
+
+        address signer = ECDSA.recover(
+            _hashTypedDataV4(keccak256(abi.encode(CONFIRM_TYPEHASH, batchId, deadline))), sigRestaurant
+        );
+        if (signer != b.restaurant) revert BadSignature();
+
+        b.confirmed = true;
+        emit BatchConfirmed(batchId, signer);
     }
 
     function _slash(address collector, uint256 amount) internal returns (uint256 taken) {
@@ -313,5 +403,13 @@ contract Turmoil is EIP712, Ownable, ReentrancyGuard {
         return _hashTypedDataV4(
             keccak256(abi.encode(BATCH_TYPEHASH, restaurant, collector, litres, nonces[restaurant], deadline))
         );
+    }
+
+    function receiptDigest(uint256 lotId, uint64 receivedLitres, uint256 deadline) external view returns (bytes32) {
+        return _hashTypedDataV4(keccak256(abi.encode(RECEIPT_TYPEHASH, lotId, receivedLitres, deadline)));
+    }
+
+    function confirmDigest(uint256 batchId, uint256 deadline) external view returns (bytes32) {
+        return _hashTypedDataV4(keccak256(abi.encode(CONFIRM_TYPEHASH, batchId, deadline)));
     }
 }

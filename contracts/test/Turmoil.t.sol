@@ -28,18 +28,22 @@ contract TurmoilTest is Test {
     uint256 internal restaurantKey;
     address internal collector;
     uint256 internal collectorKey;
+    address internal plant;
+    uint256 internal plantKey;
 
     uint256 internal constant PRICE = 248_000; // $0.248 per litre, 6dp
 
     function setUp() public {
         (restaurant, restaurantKey) = makeAddrAndKey("restaurant");
         (collector, collectorKey) = makeAddrAndKey("collector");
+        (plant, plantKey) = makeAddrAndKey("plant");
 
         usdc = new MockUSDC();
         t = new Turmoil(IERC20(address(usdc)), PRICE);
 
         t.setRestaurant(restaurant, true);
         t.setCollector(collector, true);
+        t.setPlant(plant, true);
 
         usdc.mint(address(t), 1_000_000e6); // escrow float from the truck raise
         usdc.mint(collector, 100_000e6);
@@ -125,7 +129,7 @@ contract TurmoilTest is Test {
         _reseal();
 
         uint256 before = t.deposit(collector);
-        t.settleLot(0, 800); // plant received 800L against 1000L attested
+        _settle(0, 800); // plant signed for 800L against 1000L attested
 
         uint256 allowed = (800 * (10_000 + 200)) / 10_000; // 816
         uint256 expected = (1000 - allowed) * PRICE;
@@ -136,7 +140,7 @@ contract TurmoilTest is Test {
         _attest(1000);
         _reseal();
         uint256 before = t.deposit(collector);
-        t.settleLot(0, 990); // 1% shrinkage, inside the 2% tolerance
+        _settle(0, 990); // 1% shrinkage, inside the 2% tolerance
         assertEq(t.deposit(collector), before, "no slash inside tolerance");
     }
 
@@ -157,8 +161,83 @@ contract TurmoilTest is Test {
         uint256 before = t.deposit(collector);
         assertGt(before, 0, "bond exists to burn");
 
+        skip(t.challengeWindow() + 1); // the restaurant had its chance and said nothing
         t.flagAudit(sampled[0]);
         assertEq(t.deposit(collector), 0, "entire bond forfeited");
+    }
+
+    // --- the leg that makes restaurants the check on TURMOIL ----------------
+
+    /// @notice Before this existed, flagAudit was an unsigned assertion by the
+    ///         operator: a restaurant could neither prove it confirmed a pickup nor
+    ///         dispute a false flag.
+    function test_ConfirmedBatchCannotBeFlagged() public {
+        for (uint64 i; i < 10; ++i) {
+            _attest(100);
+        }
+        _reseal();
+        uint256[] memory sampled = t.drawAudit(0);
+
+        _confirm(sampled[0], restaurantKey);
+
+        skip(t.challengeWindow() + 1);
+        vm.expectRevert(Turmoil.AlreadyConfirmed.selector);
+        t.flagAudit(sampled[0]);
+        assertEq(t.deposit(collector), 50_000e6, "bond untouched");
+    }
+
+    function test_RevertWhen_FlaggedBeforeChallengeWindowCloses() public {
+        for (uint64 i; i < 10; ++i) {
+            _attest(100);
+        }
+        _reseal();
+        uint256[] memory sampled = t.drawAudit(0);
+
+        // Flagging the instant the sample is drawn would let the operator fine anyone.
+        vm.expectRevert(Turmoil.ChallengeOpen.selector);
+        t.flagAudit(sampled[0]);
+    }
+
+    function test_RevertWhen_SomeoneElseConfirmsForTheRestaurant() public {
+        for (uint64 i; i < 10; ++i) {
+            _attest(100);
+        }
+        _reseal();
+        uint256[] memory sampled = t.drawAudit(0);
+
+        uint256 deadline = block.timestamp + 1 hours;
+        // The collector signs a confirmation on the restaurant's behalf.
+        bytes memory sig = _sign(collectorKey, t.confirmDigest(sampled[0], deadline));
+
+        vm.expectRevert(Turmoil.BadSignature.selector);
+        t.confirmBatch(sampled[0], deadline, sig);
+    }
+
+    // --- the plant signs the weight; the operator only relays it ------------
+
+    /// @notice Without this the operator supplies the very number its own mass
+    ///         balance is checked against — the ISCC failure, rebuilt.
+    function test_RevertWhen_SettledWithoutPlantSignature() public {
+        _attest(1000);
+        _reseal();
+
+        uint256 deadline = block.timestamp + 1 hours;
+        // Someone who is not a registered plant signs the receipt.
+        (, uint256 impostorKey) = makeAddrAndKey("impostor");
+        // Build the signature BEFORE arming expectRevert: receiptDigest is an external
+        // call and would otherwise be the "next call" expectRevert watches.
+        bytes memory sig = _sign(impostorKey, t.receiptDigest(0, 800, deadline));
+
+        vm.expectRevert(Turmoil.NotRegistered.selector);
+        t.settleLot(0, 800, deadline, sig);
+    }
+
+    function test_SettleRecordsWhichPlantSigned() public {
+        _attest(1000);
+        _reseal();
+        _settle(0, 800);
+        (,,, address signedBy,,,,,) = t.lots(0);
+        assertEq(signedBy, plant, "receipt attributable to a counterparty");
     }
 
     /// @notice A sample of one cannot deter: catch probability equals the fabricated
@@ -234,11 +313,13 @@ contract TurmoilTest is Test {
     function test_OwnerCanForceSealLot() public {
         _attest(1000);
         // The collector never seals, so settleLot and drawAudit can never run.
+        uint256 deadline = block.timestamp + 1 hours;
+        bytes memory sig = _sign(plantKey, t.receiptDigest(0, 800, deadline));
         vm.expectRevert(Turmoil.LotNotReady.selector);
-        t.settleLot(0, 800);
+        t.settleLot(0, 800, deadline, sig);
 
         t.sealLotOf(collector);
-        t.settleLot(0, 800);
+        _settle(0, 800);
         assertLt(t.deposit(collector), 50_000e6, "shortfall charged after force-seal");
     }
 
@@ -261,7 +342,7 @@ contract TurmoilTest is Test {
         _reseal();
 
         uint256 before = t.deposit(collector);
-        t.settleLot(0, received);
+        _settle(0, received);
         uint256 slashed = before - t.deposit(collector);
 
         uint256 allowed = (uint256(received) * (10_000 + 200)) / 10_000;
@@ -277,5 +358,17 @@ contract TurmoilTest is Test {
     function _reseal() internal {
         vm.prank(collector);
         t.sealLot();
+    }
+
+    /// The plant signs for what arrived. The operator relays it but cannot author it.
+    function _settle(uint256 lotId, uint64 received) internal {
+        uint256 deadline = block.timestamp + 1 hours;
+        bytes32 digest = t.receiptDigest(lotId, received, deadline);
+        t.settleLot(lotId, received, deadline, _sign(plantKey, digest));
+    }
+
+    function _confirm(uint256 batchId, uint256 key) internal {
+        uint256 deadline = block.timestamp + 1 hours;
+        t.confirmBatch(batchId, deadline, _sign(key, t.confirmDigest(batchId, deadline)));
     }
 }

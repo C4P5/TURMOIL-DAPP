@@ -5,8 +5,18 @@ import { TURMOIL_ABI, TURMOIL_ADDRESS, formatUsdc } from "@/lib/turmoil";
 // Chain state changes under us; never serve a cached lot.
 export const dynamic = "force-dynamic";
 
-type Lot = readonly [`0x${string}`, bigint, bigint, boolean, boolean, boolean, bigint];
-type Batch = readonly [`0x${string}`, `0x${string}`, bigint, bigint, boolean, boolean];
+type Lot = readonly [
+  `0x${string}`, // collector
+  bigint, // attestedLitres
+  bigint, // receivedLitres
+  `0x${string}`, // plant — who signed for the weight
+  bigint, // drawnAt
+  boolean, // isSealed
+  boolean, // settled
+  boolean, // drawn
+  bigint, // seed
+];
+type Batch = readonly [`0x${string}`, `0x${string}`, bigint, bigint, boolean, boolean, boolean];
 
 async function loadLot(id: string) {
   // BigInt() belongs inside the try: /lot/abc used to throw an unhandled 500
@@ -83,7 +93,7 @@ export default async function LotPage(props: { params: Promise<{ id: string }> }
     );
   }
 
-  const [collector, attested, received, isSealed, settled, drawn, seed] = data.lot;
+  const [collector, attested, received, plant, , isSealed, settled, drawn, seed] = data.lot;
 
   // Read from chain, never hardcoded: pricePerLitre and toleranceBps are both
   // owner-tunable, so a constant here would quietly start lying after setParams.
@@ -117,7 +127,7 @@ export default async function LotPage(props: { params: Promise<{ id: string }> }
             <p className="datum py-4 text-sm text-[--color-muted]">No pickups recorded.</p>
           )}
           {data.batches.map(([batchId, b]) => {
-            const [restaurant, , litres, , audited, failed] = b;
+            const [restaurant, , litres, , audited, failed, confirmed] = b;
             return (
               <div key={batchId.toString()} className="flex items-baseline justify-between py-3">
                 <div className="min-w-0">
@@ -126,7 +136,8 @@ export default async function LotPage(props: { params: Promise<{ id: string }> }
                   </p>
                   <p className="label">
                     batch #{batchId.toString()}
-                    {audited && !failed && " · audited ✓"}
+                    {audited && !failed && !confirmed && " · sampled, awaiting confirmation"}
+                    {confirmed && " · confirmed by the restaurant ✓"}
                     {failed && " · FAILED AUDIT"}
                   </p>
                 </div>
@@ -145,6 +156,10 @@ export default async function LotPage(props: { params: Promise<{ id: string }> }
         <dl className="mt-8 space-y-2">
           <Line label="Attested by drivers" value={`${attested.toString()} L`} />
           <Line label="Weighed at plant" value={settled ? `${received.toString()} L` : "—"} />
+          <Line
+            label="Weight signed by"
+            value={settled ? `${plant.slice(0, 10)}…${plant.slice(-6)}` : "—"}
+          />
           <Line
             label={`Tolerance (${(data.tolerance / 100).toFixed(1)}%)`}
             value={settled ? `${allowed.toString()} L` : "—"}

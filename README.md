@@ -78,7 +78,7 @@ TURMOIL builds the receipt - Incentivizes small businesses, and *ackchyually* co
 
 **2. The restaurant is paid in USDC, immediately.** Their wallet is created with an email address through Privy. No seed phrase, no app install, no gas — the restaurant signs **EIP-712 typed data off-chain**, and the collector submits both signatures in a single transaction and pays for it.
 
-**3. The totals have to close.** When the load reaches the plant, the plant signs a receipt for what physically arrived. The contract enforces `Σ(attested batches) ≤ received + tolerance`. Any shortfall is debited from the driver's deposit, or against a restaurant's future payouts — never from investors.
+**3. The totals have to close.** When the load reaches the plant, the plant signs — with its own key — a receipt for what physically arrived. We relay that signature; we cannot author the number. The contract enforces `Σ(attested batches) ≤ received + tolerance`, and any shortfall is debited from the collector's bond, never from investors.
 
 **4. We audit ourselves at random.** See [the audit mechanism](#audit).
 
@@ -150,7 +150,7 @@ The contract `ecrecover`s both and requires two distinct registered parties. Nob
 
 **The collector is the residual claimant.** The restaurant is paid instantly, because a small business can't wait a week. Any reconciliation shortfall comes out of the collector's deposit — so the operator has a direct financial reason to measure honestly and refuse an inflated number from a supplier.
 
-**The restaurants are the check on TURMOIL.** We collect the oil *and* issue the receipt, which is exactly the conflict of interest that broke ISCC. The answer has to be structural: **every litre requires a signature from a restaurant we do not employ**, so inflating a load means fabricating counterparties who each sign independently and each survive a random post-hoc challenge. Two of the three legs of that argument are enforced on chain today; the third — the challenge itself — is not yet, and [Honest Limits](#threat) says exactly which.
+**The restaurants are the check on TURMOIL.** We collect the oil *and* issue the receipt, which is exactly the conflict of interest that broke ISCC. The answer is structural, and all three legs are enforced on chain: **every litre requires a signature from a restaurant we do not employ**; the weight the mass balance is checked against carries **a registered plant's signature**, not a number we typed; and a sampled restaurant **confirms with its own key**, which we cannot forge and cannot overrule. Inflating a load means fabricating counterparties who each sign independently and each survive a challenge on a batch nobody could predict.
 
 ---
 
@@ -204,6 +204,8 @@ Most projects demo the happy path. We demo the system refusing to be cheated.
 | A collector inflates volume | Mass balance at settlement; the gap comes out of their bond |
 | A collector never seals, to dodge the audit | Owner force-seals the lot |
 | The auditor redraws until it flags what it wants | Reverts — the sample is drawn once |
+| **TURMOIL types its own received weight** | Reverts — the figure needs a registered plant's signature |
+| **TURMOIL flags an honest restaurant** | Reverts — a restaurant that confirmed cannot be flagged, and it has a challenge window to answer in |
 
 All three are executable tests, not slides — [`contracts/test/Turmoil.t.sol`](contracts/test/Turmoil.t.sol):
 
@@ -218,10 +220,15 @@ test_RevertWhen_AuditRedrawn                 the sample is drawn once
 test_AuditSamplesDistinctBatches             without replacement
 test_SampleFloorAppliesToSmallLots           a sample of one deters nothing
 test_AuditFailureBurnsEntireBond             a fabricated pickup costs the whole bond
+test_RevertWhen_SettledWithoutPlantSignature the weight must be signed, not typed
+test_SettleRecordsWhichPlantSigned           and it is attributable afterwards
+test_ConfirmedBatchCannotBeFlagged           a restaurant that answered is safe
+test_RevertWhen_FlaggedBeforeChallengeWindowCloses  it gets time to answer
+test_RevertWhen_SomeoneElseConfirmsForTheRestaurant only its own key will do
 testFuzz_ShortfallIsAlwaysChargedToTheCollector   (runs: 2000)
 ```
 
-16 passing. The fuzz test is the one that matters: 2,000 random `(attested, received)` pairs, asserting the gap is always charged to the collector or capped at their bond — never absorbed by investors.
+21 passing. The fuzz test is the one that matters: 2,000 random `(attested, received)` pairs, asserting the gap is always charged to the collector or capped at their bond — never absorbed by investors.
 
 Most of these exist because a strict review found the mechanism they test to be missing or wrong. The git history has the details; each fix landed with the test that would have caught it.
 
@@ -247,15 +254,15 @@ Other things this system does **not** do (yet):
 - System assumes restaurants are repeat counterparties. A one-time supplier has weaker deterrence.
 - **The bond bounds what can be recovered.** Fabricate more than the bond is worth — above roughly half a load — and the theft outruns the slash: expected value turns non-negative even at a 92% catch rate, because forfeiting the bond only cancels the gain. Faking half a load is not subtle, though. It puts the mass balance out by half, and `settleLot` catches that deterministically rather than by sampling. The two mechanisms cover different sizes of fraud, and neither is sufficient alone.
 
-### What is not built yet
+### What the operator still controls
 
-This section exists because the project's whole argument is that unverified claims are worthless. These are claims the code does **not** currently support:
+This section exists because the project's whole argument is that unverified claims are worthless, so here is what remains inside our control:
 
-- **There is no plant role on chain.** `settleLot` takes the received weight as an owner-supplied argument, so today the operator types the number its own mass balance is checked against. The design calls for the plant to sign that figure; it isn't implemented.
-- **The confirmation challenge is not on chain.** `flagAudit` is an owner assertion, not a restaurant signature. A restaurant cannot yet prove it confirmed a pickup, nor dispute a false flag.
-- **`setRestaurant` is owner-controlled**, with nothing tying an address to a real business, so fabricated restaurants cost one transaction each.
+- **`setRestaurant` is owner-controlled**, with nothing on chain tying an address to a real business. Fabricated restaurants cost one transaction each. What stops that being free is the audit: a fabricated restaurant has to answer a confirmation challenge with a key, on a batch it cannot predict — but nothing prevents an operator from holding those keys itself. Binding registration to an off-chain business identity is the obvious next step and is not built.
+- **The operator chooses when to draw the audit and when to flag.** It cannot choose *what* the sample contains, cannot redraw, and cannot flag a batch the restaurant confirmed — but it can decline to draw at all.
+- **`settleLot` still requires the owner to submit**, though it can no longer author the weight: that figure must carry a registered plant's signature.
 
-What the contract genuinely enforces today is narrower than the headline: *every litre carries a signature from an address the operator registered as a restaurant, and the totals cannot exceed what was reported received without the collector's bond paying for the gap.* That is still a real improvement on a certificate nobody can check. It is not yet "we cannot inflate our own volume."
+What the contract enforces: *every litre carries signatures from two distinct registered parties, the received weight is signed by a plant rather than typed by us, the totals cannot exceed it beyond tolerance without the collector's bond paying the gap, and a sampled restaurant can defend itself with its own signature.*
 
 ---
 

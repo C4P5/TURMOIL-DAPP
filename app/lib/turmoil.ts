@@ -95,6 +95,7 @@ export const TURMOIL_ABI = [
       { name: "lotId", type: "uint64" },
       { name: "audited", type: "bool" },
       { name: "failed", type: "bool" },
+      { name: "confirmed", type: "bool" },
     ],
   },
   {
@@ -113,6 +114,8 @@ export const TURMOIL_ABI = [
       { name: "collector", type: "address" },
       { name: "attestedLitres", type: "uint64" },
       { name: "receivedLitres", type: "uint64" },
+      { name: "plant", type: "address" },
+      { name: "drawnAt", type: "uint64" },
       { name: "isSealed", type: "bool" },
       { name: "settled", type: "bool" },
       { name: "drawn", type: "bool" },
