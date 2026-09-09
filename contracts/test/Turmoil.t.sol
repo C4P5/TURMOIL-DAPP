@@ -33,6 +33,11 @@ contract TurmoilTest is Test {
 
     uint256 internal constant PRICE = 248_000; // $0.248 per litre, 6dp
 
+    /// Fixed ref for single-shot tests. Reusing it is how replay gets exercised.
+    bytes32 internal constant ref = keccak256("fixed-ref");
+
+    uint256 internal refSeq; // fresh ref per _attest, the job the nonce used to do
+
     function setUp() public {
         (restaurant, restaurantKey) = makeAddrAndKey("restaurant");
         (collector, collectorKey) = makeAddrAndKey("collector");
@@ -65,15 +70,31 @@ contract TurmoilTest is Test {
 
     function _attest(uint64 litres) internal returns (uint256) {
         uint256 deadline = block.timestamp + 1 hours;
-        bytes32 digest = t.batchDigest(restaurant, collector, litres, deadline);
+        bytes32 r = keccak256(abi.encode("seq", refSeq++));
+        bytes32 digest = t.batchDigest(restaurant, collector, litres, r, deadline);
         return t.attest(
-            restaurant,
-            collector,
-            litres,
-            deadline,
-            _sign(restaurantKey, digest),
-            _sign(collectorKey, digest)
+            restaurant, collector, litres, r, deadline, _sign(restaurantKey, digest), _sign(collectorKey, digest)
         );
+    }
+
+    /// @notice The reason the nonce had to go. Two trucks, two QRs generated the same
+    ///         morning, both signed honestly — under a per-restaurant nonce read at
+    ///         execution time, the second was dead on arrival and failed as
+    ///         BadSignature, which looks exactly like forgery.
+    function test_ConcurrentPickupsBothSucceed() public {
+        uint256 deadline = block.timestamp + 1 hours;
+        bytes32 refA = keccak256("truck-a");
+        bytes32 refB = keccak256("truck-b");
+
+        bytes32 dA = t.batchDigest(restaurant, collector, 40, refA, deadline);
+        bytes32 dB = t.batchDigest(restaurant, collector, 60, refB, deadline);
+
+        // Both QRs exist before either is redeemed.
+        t.attest(restaurant, collector, 40, refA, deadline, _sign(restaurantKey, dA), _sign(collectorKey, dA));
+        t.attest(restaurant, collector, 60, refB, deadline, _sign(restaurantKey, dB), _sign(collectorKey, dB));
+
+        assertEq(t.batchCount(), 2, "both pickups recorded");
+        assertEq(usdc.balanceOf(restaurant), 100 * PRICE, "paid for both");
     }
 
     // --- happy path ---------------------------------------------------------
@@ -95,31 +116,31 @@ contract TurmoilTest is Test {
 
     function test_RevertWhen_OnlyRestaurantSigns() public {
         uint256 deadline = block.timestamp + 1 hours;
-        bytes32 digest = t.batchDigest(restaurant, collector, 40, deadline);
+        bytes32 digest = t.batchDigest(restaurant, collector, 40, ref, deadline);
         bytes memory sig = _sign(restaurantKey, digest);
 
         vm.expectRevert(Turmoil.BadSignature.selector);
-        t.attest(restaurant, collector, 40, deadline, sig, sig); // same key twice
+        t.attest(restaurant, collector, 40, ref, deadline, sig, sig); // same key twice
     }
 
     function test_RevertWhen_SignatureReplayed() public {
         uint256 deadline = block.timestamp + 1 hours;
-        bytes32 digest = t.batchDigest(restaurant, collector, 40, deadline);
+        bytes32 digest = t.batchDigest(restaurant, collector, 40, ref, deadline);
         bytes memory rSig = _sign(restaurantKey, digest);
         bytes memory cSig = _sign(collectorKey, digest);
 
-        t.attest(restaurant, collector, 40, deadline, rSig, cSig);
+        t.attest(restaurant, collector, 40, ref, deadline, rSig, cSig);
 
         vm.expectRevert(Turmoil.BadSignature.selector); // nonce moved on
-        t.attest(restaurant, collector, 40, deadline, rSig, cSig);
+        t.attest(restaurant, collector, 40, ref, deadline, rSig, cSig);
     }
 
     function test_RevertWhen_Expired() public {
         uint256 deadline = block.timestamp + 1 hours;
-        bytes32 digest = t.batchDigest(restaurant, collector, 40, deadline);
+        bytes32 digest = t.batchDigest(restaurant, collector, 40, ref, deadline);
         vm.warp(deadline + 1);
         vm.expectRevert(Turmoil.Expired.selector);
-        t.attest(restaurant, collector, 40, deadline, _sign(restaurantKey, digest), _sign(collectorKey, digest));
+        t.attest(restaurant, collector, 40, ref, deadline, _sign(restaurantKey, digest), _sign(collectorKey, digest));
     }
 
     // --- attack 2: inflated volume caught by mass balance -------------------
@@ -286,12 +307,12 @@ contract TurmoilTest is Test {
         t.setCollector(both, true);
 
         uint256 deadline = block.timestamp + 1 hours;
-        bytes32 digest = t.batchDigest(both, both, 100, deadline);
+        bytes32 digest = t.batchDigest(both, both, 100, ref, deadline);
         bytes memory sig = _sign(bothKey, digest);
 
         // Both signatures verify. Two roles is not two parties.
         vm.expectRevert(Turmoil.SelfDeal.selector);
-        t.attest(both, both, 100, deadline, sig, sig);
+        t.attest(both, both, 100, ref, deadline, sig, sig);
     }
 
     // --- attack 5: an unbonded collector ------------------------------------
@@ -301,11 +322,11 @@ contract TurmoilTest is Test {
         t.setCollector(broke, true);
 
         uint256 deadline = block.timestamp + 1 hours;
-        bytes32 digest = t.batchDigest(restaurant, broke, 100, deadline);
+        bytes32 digest = t.batchDigest(restaurant, broke, 100, ref, deadline);
 
         // No bond posted: every slash in the system would cap at zero.
         vm.expectRevert(Turmoil.UnderBonded.selector);
-        t.attest(restaurant, broke, 100, deadline, _sign(restaurantKey, digest), _sign(brokeKey, digest));
+        t.attest(restaurant, broke, 100, ref, deadline, _sign(restaurantKey, digest), _sign(brokeKey, digest));
     }
 
     // --- attack 6: the collector vetoing their own audit --------------------

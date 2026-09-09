@@ -24,9 +24,9 @@ export async function POST(req: Request) {
   }
 
   try {
-    const { restaurant, collector, litres, deadline, sigRestaurant, sigCollector } = await req.json();
+    const { restaurant, collector, litres, ref, deadline, sigRestaurant, sigCollector } = await req.json();
 
-    if (!restaurant || !collector || !litres || !deadline || !sigRestaurant || !sigCollector) {
+    if (!restaurant || !collector || !litres || !ref || !deadline || !sigRestaurant || !sigCollector) {
       return NextResponse.json({ error: "Missing field" }, { status: 400 });
     }
 
@@ -42,7 +42,7 @@ export async function POST(req: Request) {
       address: TURMOIL_ADDRESS,
       abi: TURMOIL_ABI,
       functionName: "attest",
-      args: [restaurant, collector, BigInt(litres), BigInt(deadline), sigRestaurant, sigCollector],
+      args: [restaurant, collector, BigInt(litres), ref, BigInt(deadline), sigRestaurant, sigCollector],
     });
 
     const txHash = await client.writeContract(request);

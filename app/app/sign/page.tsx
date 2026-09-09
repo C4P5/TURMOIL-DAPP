@@ -33,11 +33,11 @@ function SignInner() {
   const restaurant = params.get("restaurant") as `0x${string}` | null;
   const collector = params.get("collector") as `0x${string}` | null;
   const litres = params.get("litres");
-  const nonce = params.get("nonce");
+  const ref = params.get("ref");
   const deadline = params.get("deadline");
   const sigCollector = params.get("sigCollector");
 
-  const complete = restaurant && collector && litres && nonce && deadline && sigCollector;
+  const complete = restaurant && collector && litres && ref && deadline && sigCollector;
 
   // Date.now() during render is impure, and a value computed once at hydration
   // never re-evaluates — so a QR that expires while the owner reads the screen
@@ -79,7 +79,7 @@ function SignInner() {
         restaurant: restaurant!,
         collector: collector!,
         litres: BigInt(litres!),
-        nonce: BigInt(nonce!),
+        ref: ref as `0x${string}`,
         deadline: BigInt(deadline!),
       });
 
@@ -87,7 +87,7 @@ function SignInner() {
       const res = await fetch("/api/attest", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ restaurant, collector, litres, deadline, sigRestaurant, sigCollector }),
+        body: JSON.stringify({ restaurant, collector, litres, ref, deadline, sigRestaurant, sigCollector }),
       });
       const body = await res.json();
       if (!res.ok) throw new Error(body.error ?? "Relay failed");

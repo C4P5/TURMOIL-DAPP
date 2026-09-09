@@ -40,7 +40,7 @@ export const BATCH_TYPES = {
     { name: "restaurant", type: "address" },
     { name: "collector", type: "address" },
     { name: "litres", type: "uint64" },
-    { name: "nonce", type: "uint256" },
+    { name: "ref", type: "bytes32" },
     { name: "deadline", type: "uint256" },
   ],
 } as const;
@@ -49,9 +49,20 @@ export type BatchMessage = {
   restaurant: `0x${string}`;
   collector: `0x${string}`;
   litres: bigint;
-  nonce: bigint;
+  ref: `0x${string}`;
   deadline: bigint;
 };
+
+/**
+ * A pickup's unique reference. Replaces a per-restaurant nonce, which had to be
+ * read from chain when the QR was built and could only ever have one unredeemed
+ * signature outstanding — so two trucks at one restaurant on the same morning
+ * bricked the second QR. This needs no round trip and no ordering.
+ */
+export function newRef(): `0x${string}` {
+  const bytes = crypto.getRandomValues(new Uint8Array(32));
+  return `0x${Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("")}`;
+}
 
 /** Only the functions the app actually calls. ponytail: no need to ship the full ABI. */
 export const TURMOIL_ABI = [
@@ -63,18 +74,12 @@ export const TURMOIL_ABI = [
       { name: "restaurant", type: "address" },
       { name: "collector", type: "address" },
       { name: "litres", type: "uint64" },
+      { name: "ref", type: "bytes32" },
       { name: "deadline", type: "uint256" },
       { name: "sigRestaurant", type: "bytes" },
       { name: "sigCollector", type: "bytes" },
     ],
     outputs: [{ name: "batchId", type: "uint256" }],
-  },
-  {
-    type: "function",
-    name: "nonces",
-    stateMutability: "view",
-    inputs: [{ name: "", type: "address" }],
-    outputs: [{ name: "", type: "uint256" }],
   },
   {
     type: "function",

@@ -274,7 +274,9 @@ What the contract enforces: *every litre carries signatures from two distinct re
 
 | Function | What it does |
 |---|---|
-| `attest()` | Requires EIP-712 signatures from restaurant **and** collector over the same struct, with per-restaurant nonces. Pays the restaurant instantly. The restaurant never sends a transaction and never needs gas |
+| `attest()` | Requires EIP-712 signatures from restaurant **and** collector over the same struct, replay-protected by spending the digest. Pays the restaurant instantly. The restaurant never sends a transaction and never needs gas |
+| `confirmBatch()` | A sampled restaurant answers the challenge with its own signature. Gasless and relayable, like `attest` |
+| `setPlant()` / `setChallengeWindow()` | Registry for the counterparty that signs received weights, and how long a restaurant has to answer |
 | `sealLot()` | Closes the collector's open lot so the audit sample can be drawn against a fixed set |
 | `settleLot()` | Plant reports what arrived; enforces `Σ attested ≤ received + tolerance` and charges any gap to the collector's deposit |
 | `drawAudit()` | Samples `sampleBps` of the lot's batches using Hedera's PRNG at `0x169` ([HIP-351](https://hips.hedera.com/hip/hip-351)) |

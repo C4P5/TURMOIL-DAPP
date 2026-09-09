@@ -43,7 +43,15 @@ contract Turmoil is EIP712, Ownable, ReentrancyGuard {
     mapping(address => bool) public isCollector;
     mapping(address => bool) public isPlant;
     mapping(address => uint256) public deposit; // collector => posted bond
-    mapping(address => uint256) public nonces; // restaurant => next batch nonce
+    /// @notice Spent batch digests.
+    ///
+    /// Replaces a per-restaurant nonce. Replay protection needs *uniqueness*, not
+    /// *ordering* — and ordering was actively harmful: the nonce was read at execution
+    /// time, so a restaurant could only ever have one signed-but-unsubmitted batch in
+    /// existence. Two trucks generating QRs the same morning meant the second honest
+    /// signature was dead on arrival, failing as BadSignature: indistinguishable from
+    /// forgery, on stage, with two restaurants in the demo.
+    mapping(bytes32 => bool) public spent;
 
     struct Batch {
         address restaurant;
@@ -80,7 +88,7 @@ contract Turmoil is EIP712, Ownable, ReentrancyGuard {
     mapping(uint256 => uint256[]) internal _lotBatches;
 
     bytes32 private constant BATCH_TYPEHASH =
-        keccak256("Batch(address restaurant,address collector,uint64 litres,uint256 nonce,uint256 deadline)");
+        keccak256("Batch(address restaurant,address collector,uint64 litres,bytes32 ref,uint256 deadline)");
 
     bytes32 private constant RECEIPT_TYPEHASH =
         keccak256("Receipt(uint256 lotId,uint64 receivedLitres,uint256 deadline)");
@@ -153,10 +161,13 @@ contract Turmoil is EIP712, Ownable, ReentrancyGuard {
     /// @notice Record a pickup. Requires signatures from BOTH parties over the
     ///         same struct — neither can produce a valid batch alone. The restaurant
     ///         never sends a transaction and never needs gas.
+    /// @param ref A client-generated identifier, already carried in the QR. Its only
+    ///        job is to make two otherwise-identical pickups produce different digests.
     function attest(
         address restaurant,
         address collector,
         uint64 litres,
+        bytes32 ref,
         uint256 deadline,
         bytes calldata sigRestaurant,
         bytes calldata sigCollector
@@ -168,14 +179,13 @@ contract Turmoil is EIP712, Ownable, ReentrancyGuard {
         if (restaurant == collector) revert SelfDeal();
         require(litres > 0, "zero litres");
 
-        uint256 nonce = nonces[restaurant];
-        bytes32 digest = _hashTypedDataV4(
-            keccak256(abi.encode(BATCH_TYPEHASH, restaurant, collector, litres, nonce, deadline))
-        );
+        bytes32 digest =
+            _hashTypedDataV4(keccak256(abi.encode(BATCH_TYPEHASH, restaurant, collector, litres, ref, deadline)));
+        if (spent[digest]) revert BadSignature();
         if (ECDSA.recover(digest, sigRestaurant) != restaurant) revert BadSignature();
         if (ECDSA.recover(digest, sigCollector) != collector) revert BadSignature();
 
-        nonces[restaurant] = nonce + 1; // effect before interaction; kills replay
+        spent[digest] = true; // effect before interaction; kills replay
 
         uint256 lotId = _openLot(collector);
         batchId = batches.length;
@@ -395,13 +405,15 @@ contract Turmoil is EIP712, Ownable, ReentrancyGuard {
         return lots.length;
     }
 
-    function batchDigest(address restaurant, address collector, uint64 litres, uint256 deadline)
+    /// @dev Pure with respect to chain state — no nonce lookup — so the collector's app
+    ///      can build a QR without a round trip, and two QRs can be live at once.
+    function batchDigest(address restaurant, address collector, uint64 litres, bytes32 ref, uint256 deadline)
         external
         view
         returns (bytes32)
     {
         return _hashTypedDataV4(
-            keccak256(abi.encode(BATCH_TYPEHASH, restaurant, collector, litres, nonces[restaurant], deadline))
+            keccak256(abi.encode(BATCH_TYPEHASH, restaurant, collector, litres, ref, deadline))
         );
     }
 

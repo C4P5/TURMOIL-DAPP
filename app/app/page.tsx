@@ -4,8 +4,7 @@ import { useState } from "react";
 import { usePrivy } from "@privy-io/react-auth";
 import { QRCodeSVG } from "qrcode.react";
 import { useSignBatch } from "@/lib/useSignBatch";
-import { publicClient } from "@/lib/publicClient";
-import { TURMOIL_ABI, TURMOIL_ADDRESS } from "@/lib/turmoil";
+import { newRef } from "@/lib/turmoil";
 
 /**
  * Collector view. The driver measures the oil, signs the batch, and shows the
@@ -26,12 +25,9 @@ export default function CollectorPage() {
     setError(null);
     setBusy(true);
     try {
-      const nonce = (await publicClient.readContract({
-        address: TURMOIL_ADDRESS,
-        abi: TURMOIL_ABI,
-        functionName: "nonces",
-        args: [restaurant as `0x${string}`],
-      })) as bigint;
+      // No chain read to build a QR: the ref is generated here, so two trucks can
+      // have live QRs for the same restaurant at once.
+      const ref = newRef();
 
       // 30 minutes: long enough for a pickup, short enough that a stale
       // signature is worthless if the phone is lost.
@@ -40,7 +36,7 @@ export default function CollectorPage() {
         restaurant: restaurant as `0x${string}`,
         collector: address!,
         litres: BigInt(litres),
-        nonce,
+        ref,
         deadline,
       };
 
@@ -50,7 +46,7 @@ export default function CollectorPage() {
         restaurant: message.restaurant,
         collector: message.collector,
         litres: litres,
-        nonce: nonce.toString(),
+        ref,
         deadline: deadline.toString(),
         sigCollector: sig,
       });

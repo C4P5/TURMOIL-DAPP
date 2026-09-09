@@ -45,7 +45,7 @@ export function useSignBatch() {
           restaurant: message.restaurant,
           collector: message.collector,
           litres: message.litres.toString(),
-          nonce: message.nonce.toString(),
+          ref: message.ref,
           deadline: message.deadline.toString(),
         },
       };

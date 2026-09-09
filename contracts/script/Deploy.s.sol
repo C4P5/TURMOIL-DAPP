@@ -72,6 +72,6 @@ contract Deploy is Script {
         console.log("chainId            :", block.chainid);
         console.log("verifyingContract  :", address(turmoil));
         console.log("primaryType        : Batch");
-        console.log("types.Batch        : address restaurant, address collector, uint64 litres, uint256 nonce, uint256 deadline");
+        console.log("types.Batch        : address restaurant, address collector, uint64 litres, bytes32 ref, uint256 deadline");
     }
 }
