@@ -150,7 +150,7 @@ The contract `ecrecover`s both and requires two distinct registered parties. Nob
 
 **The collector is the residual claimant.** The restaurant is paid instantly, because a small business can't wait a week. Any reconciliation shortfall comes out of the collector's deposit — so the operator has a direct financial reason to measure honestly and refuse an inflated number from a supplier.
 
-**The restaurants are the check on TURMOIL.** We collect the oil *and* issue the receipt, which is exactly the conflict of interest that broke ISCC. The answer is structural: **we cannot inflate our own volume, because every litre requires a signature from a restaurant we do not employ — and the audit challenges them directly, after the load is sealed.**
+**The restaurants are the check on TURMOIL.** We collect the oil *and* issue the receipt, which is exactly the conflict of interest that broke ISCC. The answer has to be structural: **every litre requires a signature from a restaurant we do not employ**, so inflating a load means fabricating counterparties who each sign independently and each survive a random post-hoc challenge. Two of the three legs of that argument are enforced on chain today; the third — the challenge itself — is not yet, and [Honest Limits](#threat) says exactly which.
 
 ---
 
@@ -158,26 +158,37 @@ The contract `ecrecover`s both and requires two distinct registered parties. Nob
 
 ## The Audit Mechanism
 
-After a load closes, the contract calls Hedera's PRNG precompile and selects **10% of the pickups at random**. Those restaurants get a one-tap confirmation challenge. A failed confirmation is punished **as if the same proportion of the whole load were fake.**
+Once a load is sealed, the contract draws a random sample of the pickups inside it — **30% of the batches, never fewer than three** — using Hedera's PRNG precompile. Those restaurants are asked to confirm the pickup happened. **A failed confirmation burns the collector's entire bond.**
 
 ```
 Hedera PRNG:  IPrngSystemContract(0x169).getPseudorandomSeed()  → bytes32
               (running hash of the n-3 transaction record, HIP-351)
 
-Seed is drawn AFTER the load is sealed, so the collector cannot
-know in advance which pickups will be challenged.
+Drawn AFTER the lot is sealed, once only, and sampled without
+replacement — so the collector cannot know what will be checked,
+and the drawer cannot redraw until it likes the answer.
 ```
 
-**Why cheating loses money.** Fake 5 of 100 pickups; 10 are sampled without replacement:
+### Why cheating loses money
 
-```
-P(no fake sampled) = (90·89·88·87·86) / (100·99·98·97·96) ≈ 0.584
-P(caught)          ≈ 41.6%
-```
+Two numbers do the work: how much of a lot gets sampled, and how large the collector's bond is relative to the lot it secures. The bond is **50% of lot value**, and a caught fabrication forfeits **all** of it.
 
-Get caught once and you are fined as though 10% of the load were fake. With the deposit sized at **10% of load value**, that is the entire deposit — a ~41.6% chance of losing everything to gain 5%. The expected value of cheating is negative. That is the whole design.
+Getting caught costs the bond while you keep what you stole, so the expectation is `EV = f − p·D` for fabricated fraction `f`, catch probability `p`, and bond `D`:
 
-**Why that threshold matters.** Relabelling palm oil as waste earns $300–565 per tonne, and a trader in the NDR investigation called it better than drug dealing. Deterrence that isn't priced against a number that large is decoration. Every parameter here — sample rate, extrapolation factor, deposit size — exists to keep the expected value negative against *that* payoff, and all three are tunable as it moves.
+| Batches in lot | Sampled | Fabricated | P(caught) | EV of cheating |
+|---|---|---|---|---|
+| 100 | 30 | 5% | 83.9% | **−36.96%** |
+| 100 | 30 | 10% | 97.7% | **−38.85%** |
+| 10 | 3 | 10% | 30.0% | **−5.00%** |
+| 4 | 3 | 25% | 75.0% | **−12.50%** |
+
+*Hypergeometric, sampling without replacement, expressed as a fraction of lot value.*
+
+**Why the sample has a floor.** A flat percentage of a small lot rounds down to a single draw, and with one draw the catch probability is simply the fabricated fraction — so `EV = f·(1 − D)`, which is negative only if the bond exceeds the entire lot's value. Three is the smallest sample that deters anything, so it is a floor rather than a target.
+
+**Why the fine is the whole bond, not a share of it.** An earlier version fined an unbiased extrapolation of the sample — fake 5%, get fined as though 10% were fake. That is zero-EV by construction, and at a 41.6% catch rate it was strictly *positive*-EV: a caught cheat forfeited a bond worth twice what it stole while an uncaught one kept everything. Deterrence needs the downside to dominate the upside, which no unbiased estimator can do.
+
+**Why any of this is sized the way it is.** Relabelling palm oil as waste earns $300–565 per tonne, and a trader in the NDR investigation called it better than drug dealing. Deterrence that isn't priced against a number that large is decoration. Sample rate, sample floor and bond size are all owner-tunable, because that payoff moves.
 
 ---
 
@@ -188,20 +199,31 @@ Most projects demo the happy path. We demo the system refusing to be cheated.
 | Attack | What stops it |
 |---|---|
 | A restaurant records a pickup alone | Reverts — two distinct registered keys required |
-| A restaurant inflates its volume | Mass balance at the plant, plus the random audit |
-| **TURMOIL inflates a load** | Every litre needs a signature from a restaurant we don't employ; the audit asks them directly |
+| One address registered in both roles pays itself | Reverts — two roles is not two parties |
+| A collector attests without posting a bond | Reverts — an unbonded collector caps every slash at zero |
+| A collector inflates volume | Mass balance at settlement; the gap comes out of their bond |
+| A collector never seals, to dodge the audit | Owner force-seals the lot |
+| The auditor redraws until it flags what it wants | Reverts — the sample is drawn once |
 
 All three are executable tests, not slides — [`contracts/test/Turmoil.t.sol`](contracts/test/Turmoil.t.sol):
 
 ```
 test_RevertWhen_OnlyRestaurantSigns          one party cannot invent a pickup
+test_RevertWhen_SelfDeal                     two roles is not two parties
+test_RevertWhen_UnderBonded                  no bond, no attestation
 test_RevertWhen_SignatureReplayed            a signature cannot be reused
 test_SettleSlashesShortfallBeyondTolerance   inflated volume caught by mass balance
-test_AuditFailureFinesExtrapolated           a fabricated pickup costs the deposit
+test_OwnerCanForceSealLot                    the collector cannot dodge settlement
+test_RevertWhen_AuditRedrawn                 the sample is drawn once
+test_AuditSamplesDistinctBatches             without replacement
+test_SampleFloorAppliesToSmallLots           a sample of one deters nothing
+test_AuditFailureBurnsEntireBond             a fabricated pickup costs the whole bond
 testFuzz_ShortfallIsAlwaysChargedToTheCollector   (runs: 2000)
 ```
 
-10 passing. The fuzz test is the one that matters: 2,000 random `(attested, received)` pairs, asserting the gap is always charged to the collector or capped at their bond — never absorbed by investors.
+16 passing. The fuzz test is the one that matters: 2,000 random `(attested, received)` pairs, asserting the gap is always charged to the collector or capped at their bond — never absorbed by investors.
+
+Most of these exist because a strict review found the mechanism they test to be missing or wrong. The git history has the details; each fix landed with the test that would have caught it.
 
 > 🚧 **Demo recording — WIP**
 
@@ -223,6 +245,17 @@ Other things this system does **not** do (yet):
 - It does not replace an accredited certification body. It produces the evidence one would need. Exploring the feasibility of adding this to the platform is a top priority PR
 - It won't stop plants from lying about what they received — but the plant is also the party paying, so understating costs it money, and the drivers' signed batches contradict it. An extraordinarily dumb thing to do, in my most honest opinion.
 - System assumes restaurants are repeat counterparties. A one-time supplier has weaker deterrence.
+- **The bond bounds what can be recovered.** Fabricate more than the bond is worth — above roughly half a load — and the theft outruns the slash: expected value turns non-negative even at a 92% catch rate, because forfeiting the bond only cancels the gain. Faking half a load is not subtle, though. It puts the mass balance out by half, and `settleLot` catches that deterministically rather than by sampling. The two mechanisms cover different sizes of fraud, and neither is sufficient alone.
+
+### What is not built yet
+
+This section exists because the project's whole argument is that unverified claims are worthless. These are claims the code does **not** currently support:
+
+- **There is no plant role on chain.** `settleLot` takes the received weight as an owner-supplied argument, so today the operator types the number its own mass balance is checked against. The design calls for the plant to sign that figure; it isn't implemented.
+- **The confirmation challenge is not on chain.** `flagAudit` is an owner assertion, not a restaurant signature. A restaurant cannot yet prove it confirmed a pickup, nor dispute a false flag.
+- **`setRestaurant` is owner-controlled**, with nothing tying an address to a real business, so fabricated restaurants cost one transaction each.
+
+What the contract genuinely enforces today is narrower than the headline: *every litre carries a signature from an address the operator registered as a restaurant, and the totals cannot exceed what was reported received without the collector's bond paying for the gap.* That is still a real improvement on a certificate nobody can check. It is not yet "we cannot inflate our own volume."
 
 ---
 
@@ -253,7 +286,7 @@ Every economic parameter — price per litre, tolerance, sample rate, deposit si
 
 **Truck share (ERC-3643).** Issue price = truck cost ÷ number of shares. Whitelisted holders only, transfer restrictions enforced by the compliance module. Holders receive USDC distributions **only from revenue that actually arrived** — there is no promised yield, no floor price, and no minted token backing a claim the system cannot fund. A buyback fund accrues from a fixed percentage of revenue and redeems at whatever it can genuinely cover.
 
-**Collector deposit.** Sized at 10% of load value, so the audit arithmetic above holds literally.
+**Collector bond.** **50% of lot value, and `attest` refuses to record a pickup without it.** The bond is the only thing any slash in this system can ever take, so a bond that doesn't cover the lot it secures makes every enforcement path decoration. A caught fabrication forfeits all of it.
 
 > 🚧 **WIP — shares per truck, real truck acquisition cost, buyback percentage. Pending field data.**
 
