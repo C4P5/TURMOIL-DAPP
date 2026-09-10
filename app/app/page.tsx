@@ -181,56 +181,97 @@ function Hero() {
   but it may not present an illustration as a live reading. The real numbers live
   one click away on /lot/[id], which reads them from the contract.
 */
+/*
+  This section used to show a mock receipt with invented figures — 412 L attested,
+  410 L weighed — captioned "illustrative". On a page whose whole argument is that
+  numbers should not be taken on trust, that was the wrong artifact. Every figure
+  below is a real value read back from a deployed contract, and every one of them
+  is checkable by a stranger with a block explorer.
+*/
+
+const EVIDENCE = [
+  {
+    claim: "A restaurant is paid without ever transacting",
+    proof: "Balance 0 → $4.96 for 20 L, in the same transaction that recorded the pickup. The restaurant signed typed data and sent nothing.",
+  },
+  {
+    claim: "The audit sample really is unpredictable",
+    proof: "Seed 0xa5df6581…b387df, drawn from Hedera's PRNG at 0x169 after the lot sealed. A second lot drew a different one.",
+  },
+  {
+    claim: "Mass balance is arithmetic, not a promise",
+    proof: "20 L attested against an 18 L plant receipt. Tolerance allowed 18. The 2 L gap cost the collector 0.496 USDC, taken from the bond.",
+  },
+  {
+    claim: "An unanswered audit costs the whole bond",
+    proof: "A sampled batch went unconfirmed past the challenge window. The collector's deposit went 499.504 → 0.",
+  },
+  {
+    claim: "A restaurant's signature stops the slash",
+    proof: "A second batch was sampled and confirmed by its restaurant. Flagging it then reverted AlreadyConfirmed and the bond stayed whole.",
+  },
+  {
+    claim: "The truck share refuses unapproved holders",
+    proof: "An ERC-3643 transfer to a wallet that is not on the allow list reverts with AccountIsBlocked. Compliance that has already said no.",
+  },
+];
+
 function Receipt() {
   return (
     <section className="mx-auto max-w-6xl px-6 py-24">
       <SectionHead
-        eyebrow="The artifact"
-        title="What a lot looks like when it closes"
-        lede="Public, no wallet, no login. Every figure below is read from the contract at request time — the page holds no database and stores nothing of its own."
+        eyebrow="Live on Hedera testnet"
+        title="Every claim above has a transaction behind it"
+        lede="Not a prototype of the idea. A deployed contract whose runtime bytecode matches the committed source, with the enforcement path exercised end to end — including the parts where it refuses us."
       />
-      <div className="mt-14">
-        <ReceiptPreview />
+
+      <div className="mt-14 grid gap-3 sm:grid-cols-2">
+        {EVIDENCE.map((e) => (
+          <div key={e.claim} className="glass sheen p-7">
+            <p className="mb-3 text-lg">{e.claim}</p>
+            <p className="leading-relaxed text-muted">{e.proof}</p>
+          </div>
+        ))}
+      </div>
+
+      <div className="glass sheen mt-3 p-7 md:p-8">
+        <p className="label mb-5">Deployed</p>
+        <div className="grid gap-4 md:grid-cols-3">
+          <Deployed
+            name="Turmoil.sol"
+            id="0.0.10448308"
+            note="attestation, mass balance, audit"
+          />
+          <Deployed
+            name="TURMOIL UNIT 001"
+            id="0.0.10452566"
+            note="ERC-3643 truck share, 4,000 issued"
+          />
+          <Deployed name="Settlement" id="0.0.10448306" note="6-decimal USDC stand-in" />
+        </div>
+        <p className="label mt-6 leading-relaxed">
+          Circle&rsquo;s testnet faucet reports success and delivers nothing on Hedera, and no
+          DEX there carries their USDC — so the demo settles against a stand-in with the same
+          six decimals. <code>payToken</code> is immutable and token-agnostic; binding the real
+          one is a config change, and an earlier deployment ran on it.
+        </p>
       </div>
     </section>
   );
 }
 
-function ReceiptPreview() {
+function Deployed({ name, id, note }: { name: string; id: string; note: string }) {
   return (
-    <div className="glass sheen overflow-hidden p-8 md:p-10">
-      <div className="mb-8 flex flex-wrap items-baseline justify-between gap-4">
-        <div>
-          <p className="label">Chain of custody</p>
-          <p className="datum text-2xl">LOT #0</p>
-        </div>
-        <span className="stamp text-pass">Settled</span>
-      </div>
-
-      <div className="grid gap-y-3 sm:grid-cols-3 sm:gap-8">
-        <Reading label="Attested by drivers" value="412 L" />
-        <Reading label="Weighed at plant" value="410 L" />
-        <Reading label="Sampled at random" value="3 of 10" />
-      </div>
-
-      <div className="mt-8 flex items-center gap-3 rounded border border-pass/40 px-4 py-3">
-        <span className="datum text-sm text-pass">Mass balance closes</span>
-        <span className="label">Σ attested ≤ received + tolerance</span>
-      </div>
-
-      <p className="label mt-6">
-        Illustrative figures. The live receipt reads every value from the contract.
-      </p>
-    </div>
-  );
-}
-
-function Reading({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex items-baseline justify-between sm:block">
-      <p className="label sm:mb-1">{label}</p>
-      <p className="datum text-2xl">{value}</p>
-    </div>
+    <a
+      href={`https://hashscan.io/testnet/contract/${id}`}
+      target="_blank"
+      rel="noreferrer"
+      className="group block"
+    >
+      <p className="mb-1 text-base">{name}</p>
+      <p className="datum text-sm text-oil group-hover:underline">{id} ↗</p>
+      <p className="label mt-1">{note}</p>
+    </a>
   );
 }
 
@@ -324,36 +365,47 @@ function Limit() {
 
 /* -------------------------------------------------------------------------- */
 
+/*
+  `live` means there is a transaction on Hedera testnet behind it. `designed`
+  means exactly what it says. Labelling our own unbuilt layers costs a little
+  and buys the only thing that matters on a page like this, which is that the
+  live ones can be believed without checking.
+*/
 const LAYERS = [
   {
     tag: "L1",
     name: "Dual attestation",
     body: "A batch exists only if the restaurant and the collector both sign it. The owner signs by scanning a QR on the driver's phone, so physical co-presence is implied by the scan itself.",
     kills: "Kills unilateral fabrication.",
+    status: "live",
   },
   {
     tag: "L2",
     name: "Conservation law",
     body: "The plant signs for the weight it actually received. The contract enforces Σ(attestations) ≤ receipt + tolerance. A skimming driver produces an arithmetic gap.",
     kills: "A bill of lading, on chain.",
+    status: "live",
   },
   {
     tag: "L3",
     name: "Revenue-gated payout",
     body: "Truck-token holders are paid only out of stablecoin the system actually received. Inflating volume cannot manufacture a distribution.",
     kills: "Inflation stops paying.",
+    status: "designed",
   },
   {
     tag: "L4",
     name: "Anomaly flagging",
     body: "A thin agent reads events and flags what does not fit: a restaurant at 3× its own eight-week average, a route whose volume never closes, one driver's gap trending. A risk scorer, not an oracle.",
     kills: "Enforcement stays in the mechanism, not in a model's judgment.",
+    status: "designed",
   },
   {
     tag: "L5",
     name: "Random audit, extrapolated slashing",
     body: "When a lot seals, the contract calls Hedera's PRNG at 0x169 and samples 30% of the batches — after sealing, so nobody knows which. A sampled restaurant confirms with its own signature. A failure burns the collector's bond.",
     kills: "This is how customs auditing works.",
+    status: "live",
   },
 ];
 
@@ -372,7 +424,18 @@ function Mechanism() {
             <div className="grid gap-5 md:grid-cols-[5rem_1fr_15rem] md:items-baseline md:gap-8">
               <p className="datum text-3xl text-oil">{l.tag}</p>
               <div>
-                <p className="mb-2 text-xl">{l.name}</p>
+                <div className="mb-2 flex flex-wrap items-baseline gap-3">
+                  <p className="text-xl">{l.name}</p>
+                  <span
+                    className={`label rounded border px-2 py-0.5 ${
+                      l.status === "live"
+                        ? "border-pass/40 text-pass"
+                        : "border-line text-muted"
+                    }`}
+                  >
+                    {l.status === "live" ? "live on testnet" : "designed, not built"}
+                  </span>
+                </div>
                 <p className="leading-relaxed text-muted">{l.body}</p>
               </div>
               <p className="label leading-relaxed md:text-right">{l.kills}</p>
@@ -491,25 +554,30 @@ function Flow() {
 
 /* -------------------------------------------------------------------------- */
 
+/*
+  Two lines, not two essays. Both choices are already demonstrated further up the
+  page — the 0x169 seed in the evidence block, the gasless signature in the flow —
+  so restating them at length was the page arguing with itself.
+*/
 function Stack() {
   const items = [
     {
       name: "Hedera",
-      body: "One contract, one chain. The audit draws its seed from the native PRNG at 0x169 — no oracle, no VRF wait. Trucks are issued as ERC-3643 through Asset Tokenization Studio, because a share of an operating asset is a security and should behave like one.",
+      body: "Native PRNG at 0x169 for the audit draw — no oracle, no VRF wait. Trucks issued as ERC-3643 through Asset Tokenization Studio, because a share of an operating asset is a security.",
     },
     {
       name: "Privy",
-      body: "A restaurant owner logs in with an email address, sees the amount, and signs. They never hold HBAR, never send a transaction, never install anything. The collector relays it and pays the gas — correct, since the collector is the one earning a margin.",
+      body: "Email login, embedded wallet, EIP-712 signature. No HBAR, no transaction, no install. The collector relays and pays the gas, since the collector earns the margin.",
     },
   ];
 
   return (
-    <section className="mx-auto max-w-6xl px-6 py-24">
-      <div className="grid gap-3 md:grid-cols-2">
+    <section className="mx-auto max-w-6xl px-6 py-16">
+      <div className="glass sheen grid gap-6 p-7 md:grid-cols-2 md:gap-10 md:p-8">
         {items.map((i) => (
-          <div key={i.name} className="glass sheen p-8 md:p-10">
-            <p className="label mb-5">Built on</p>
-            <p className="display mb-5 text-3xl">{i.name}</p>
+          <div key={i.name}>
+            <p className="label mb-2">Built on</p>
+            <p className="mb-2 text-2xl">{i.name}</p>
             <p className="leading-relaxed text-muted">{i.body}</p>
           </div>
         ))}
