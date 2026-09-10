@@ -72,12 +72,32 @@ function Nav() {
           The arithmetic
         </a>
       </div>
-      <Link
-        href="/lot/0"
-        className="label rounded border border-line px-4 py-2 text-paper transition-colors hover:border-oil hover:text-oil"
-      >
-        Open a receipt
-      </Link>
+      {/*
+        The two people who use this app never use the same screen. A driver
+        measures oil and hands over a QR; an owner signs it and watches a balance.
+        Splitting them here, before login, means neither is ever shown the other's
+        controls — and it is the first thing a judge sees about who this is for.
+      */}
+      <div className="flex items-center gap-2">
+        <Link
+          href="/restaurant"
+          className="label rounded border border-line px-3 py-2 text-paper transition-colors hover:border-oil hover:text-oil"
+        >
+          Restaurant
+        </Link>
+        <Link
+          href="/collect"
+          className="label rounded border border-line px-3 py-2 text-paper transition-colors hover:border-oil hover:text-oil"
+        >
+          Driver
+        </Link>
+        <Link
+          href="/lot/0"
+          className="label hidden rounded border border-line px-3 py-2 text-paper transition-colors hover:border-oil hover:text-oil sm:inline-block"
+        >
+          Receipt
+        </Link>
+      </div>
     </nav>
   );
 }

@@ -134,6 +134,24 @@ export const TURMOIL_ABI = [
     inputs: [],
     outputs: [{ name: "", type: "uint16" }],
   },
+  {
+    type: "function",
+    name: "batchCount",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ name: "", type: "uint256" }],
+  },
+  // Read the settlement token from the contract instead of hardcoding it. payToken
+  // is immutable but not universal: this deployment settles in DemoUSDC and the
+  // previous one in Circle's USDC. Asking the contract is what makes the restaurant
+  // view correct on both without an env var to forget.
+  {
+    type: "function",
+    name: "payToken",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ name: "", type: "address" }],
+  },
   // The errors attest() can revert with. viem can only name a revert it can find
   // in the ABI: without these, a failed pickup shows the restaurant owner a raw
   // selector like 0x983d6bdc — which is exactly what it did on Hedera testnet.
@@ -142,6 +160,37 @@ export const TURMOIL_ABI = [
   { type: "error", name: "SelfDeal", inputs: [] },
   { type: "error", name: "BadSignature", inputs: [] },
   { type: "error", name: "UnderBonded", inputs: [] },
+] as const;
+
+/**
+ * Only what the restaurant view needs from the settlement token. ponytail: three
+ * entries, not a full ERC-20 ABI — nothing here mints, approves or burns.
+ */
+export const ERC20_ABI = [
+  {
+    type: "function",
+    name: "balanceOf",
+    stateMutability: "view",
+    inputs: [{ name: "", type: "address" }],
+    outputs: [{ name: "", type: "uint256" }],
+  },
+  {
+    type: "function",
+    name: "decimals",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ name: "", type: "uint8" }],
+  },
+  {
+    type: "function",
+    name: "transfer",
+    stateMutability: "nonpayable",
+    inputs: [
+      { name: "to", type: "address" },
+      { name: "value", type: "uint256" },
+    ],
+    outputs: [{ name: "", type: "bool" }],
+  },
 ] as const;
 
 /** USDC is 6 decimals. Formatting it as 18 is how demos show someone $0.000000000048. */
