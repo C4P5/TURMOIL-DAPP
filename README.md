@@ -41,10 +41,12 @@ The numbers, from the people who investigate this for a living:
 
 | Finding | Date | Source |
 |---|---|---|
-| Roughly **2 Mt of POME-oil-based biofuel** reached the European market in 2023 — **more than global production capacity** | Apr 2025 | [Transport & Environment](https://www.transportenvironment.org/articles/uco) |
+| Roughly **2 Mt of POME-oil-based biofuel** reached the European market in 2023, against an estimated **~1 Mt available globally** | Mar 2025 | [Transport & Environment, *Palm oil in disguise?*](https://www.transportenvironment.org/uploads/files/202504_POME_fraud_Report.pdf) |
 | **1.8 million tonnes** of fraudulently ISCC-certified POME entered the EU | 2023 | [Maritime Executive](https://maritime-executive.com/article/eu-scrutinizes-fraud-in-certification-of-biofuels) |
 | ISCC certified volumes **exceed physical production** | Mar 2025 | Same |
 | ISCC issued certification for fuel from a refinery in the UAE that, per BLE satellite imagery, **does not exist**. ISCC suspended the *importer's* certificate — **not the auditor** that approved the non-existent refinery *(as reported by NDR Panorama 3)* | Nov 2025 | [NDR Panorama 3](https://www.ndr.de/fernsehen/sendungen/panorama3/meldungen/betrug-mit-biotreibstoffen-besser-als-drogenhandel,betrug-biodiesel-hvo-100.html) |
+
+**Where the first row is contested, before you find it yourself.** [studioGearUp](https://www.studiogearup.com/current-pome-based-biofuels-in-eu-fall-within-current-production-potential/) puts global POME-oil production at **1.2–2 Mt** rather than the ~1 Mt T&E works from — which would place 2023 European consumption *at* the ceiling of what is produced rather than provably past it. We cite the stricter figure because it is the one in the report, and name the looser one because the argument does not depend on it: when the volume of a commodity and the volume of its certification are the same number, and no independent record of either exists, "at the ceiling" and "past the ceiling" are the same problem. That gap is what this project fills.
 
 ### The scale of the incentive
 
@@ -64,7 +66,7 @@ The numbers, from the people who investigate this for a living:
 | European Commission opened an **anti-dumping investigation**, plus a probe into Indonesian biodiesel routed via China to evade duties | Dec 2023 | [Fastmarkets](https://www.fastmarkets.com/insights/ec-confirms-china-eu-waste-biofuel-probe/) |
 | **11 arrests in Indonesia** — customs officials and executives — over virgin palm oil declared as POME | Feb 2026 | QC Intel |
 
-Palm oil and used cooking oil are chemically similar enough that you cannot reliably tell them apart by looking, and largely not by testing either. So the entire market runs on **paperwork** — and the body issuing that paperwork certified more POME than the planet produces, and a refinery that isn't there.
+Palm oil and used cooking oil are chemically similar enough that you cannot reliably tell them apart by looking, and largely not by testing either. So the entire market runs on **paperwork** — and the body issuing that paperwork certified more POME than the planet is thought to produce, and a refinery that isn't there.
 
 The fraud is possible because **a certificate is a claim made by one party about oil nobody else saw.**
 
@@ -432,18 +434,29 @@ npm run dev                      # localhost:3000
 
 `next dev` reads the environment only at boot — restart it after editing `.env.local`, or the app will keep serving the previous configuration. If `NEXT_PUBLIC_TURMOIL_ADDRESS` is unset the app says so in a banner instead of failing silently.
 
-### Registering counterparties
+### Onboarding a restaurant
 
-Only registered addresses can attest. As the contract owner:
+Only registered addresses can attest. The collector does this from `/collect` — paste the restaurant's address and press **New restaurant? Register + activate wallet**. That one call registers them *and* sends 1 HBAR:
+
+```
+POST /api/onboard  { "restaurant": "0x…" }
+→ { "registered": "now", "funded": "now", "registerTx": "0x…", "fundTx": "0x…" }
+```
+
+It reads before it writes, so calling it twice costs one read and sends nothing.
+
+**Why the HBAR.** Signing a pickup is gasless and stays that way. *Withdrawing* is an ordinary token transfer the restaurant pays for, and an email-login wallet starts with nothing — without this, a restaurant could be paid and then be unable to touch what it earned. One HBAR covers many withdrawals and is a customer-acquisition cost measured in cents.
+
+It is also what puts them on the ledger at all: a Privy wallet is an EVM address with no Hedera account behind it until something arrives. The transfer creates the account with unlimited auto-association (HIP-904), which is why the restaurant never signs a token association either.
+
+The grant is deliberately **not** deducted from the USDC payout — pricing HBAR against USDC would need an oracle, and paying a thin-margin business partly in a floating asset is the objection that killed a native token in this design. It is equally deliberately **not** inside `attest()`: a dry HBAR float would then stop pickups, and onboarding failing is recoverable where collection failing is not.
+
+Collectors are still registered by the owner:
 
 ```bash
 cast send <contract> "setCollector(address,bool)" <collector> true \
   --rpc-url "$HEDERA_RPC_URL" --private-key "$PRIVATE_KEY"
-cast send <contract> "setRestaurant(address,bool)" <restaurant> true \
-  --rpc-url "$HEDERA_RPC_URL" --private-key "$PRIVATE_KEY"
 ```
-
-A restaurant's embedded wallet is not a Hedera account until it holds something. Send it a dust HBAR transfer once at signup; the account is then created with unlimited auto-association and can receive USDC without ever signing an association transaction.
 
 ---
 
@@ -545,6 +558,8 @@ It was caught by running a review that tried to break the contract, not by readi
 ## References
 
 - [Transport & Environment — *UCO: The Certified Unknown*](https://www.transportenvironment.org/articles/uco)
+- [Transport & Environment — *Palm oil in disguise?* (POME fraud report, March 2025)](https://www.transportenvironment.org/uploads/files/202504_POME_fraud_Report.pdf)
+- [studioGearUp — *Current POME-based biofuels in EU fall within current production potential*](https://www.studiogearup.com/current-pome-based-biofuels-in-eu-fall-within-current-production-potential/) — the counter-estimate, cited because it disputes us
 - [NDR Panorama 3 — *Betrug mit Biotreibstoffen: "Besser als Drogenhandel"*](https://www.ndr.de/fernsehen/sendungen/panorama3/meldungen/betrug-mit-biotreibstoffen-besser-als-drogenhandel,betrug-biodiesel-hvo-100.html) (German public broadcaster)
 - [OCCRP — *How Biofuels Scams Have Undermined A Flagship EU Climate Policy*](https://www.occrp.org/en/investigation/how-biofuels-scams-have-undermined-a-flagship-eu-climate-policy)
 - [S&P Global — *German biofuels regulator links two companies to certification fraud*](https://www.spglobal.com/energy/en/news-research/latest-news/crude-oil/050725-german-biofuels-regulator-links-two-companies-to-certification-fraud)
