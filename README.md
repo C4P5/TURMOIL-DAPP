@@ -359,7 +359,8 @@ Next.js with the Privy React SDK. Email login creates an embedded ECDSA wallet; 
 
 | Route | Who | What happens |
 |---|---|---|
-| `/` | Collector | Enter litres, sign as collector, render a QR carrying the batch and that signature |
+| `/` | Anyone | Static landing — the crime, the honest limit, the mechanism, the arithmetic, in that order. No client components, no wallet, no chain reads: it renders identically with zero environment variables set, which is the one URL a judge is most likely to open |
+| `/collect` | Collector | Enter litres, sign as collector, render a QR carrying the batch and that signature |
 | `/sign` | Restaurant | Email login, sees the litres and the exact USDC amount read live from the contract, signs. No wallet, no HBAR, no transaction |
 | `/lot/[id]` | Anyone | Provenance receipt — every batch in a lot, the plant's received weight, and the audit seed once drawn |
 | `/api/attest` | Relayer | Submits a batch both parties already signed. Holds no authority: `attest()` verifies both signatures onchain, so a leaked relayer key can forge nothing and replay nothing |

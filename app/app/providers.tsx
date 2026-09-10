@@ -11,9 +11,9 @@ export function Providers({ children }: { children: React.ReactNode }) {
   if (!appId) {
     return (
       <>
-        <div className="border-b border-[--color-fail] bg-[--color-fail]/10 px-4 py-2 text-xs">
-          <span className="datum text-[--color-fail]">NEXT_PUBLIC_PRIVY_APP_ID unset</span>
-          <span className="text-[--color-muted]"> — login and signing are disabled.</span>
+        <div className="border-b border-fail bg-fail/10 px-4 py-2 text-xs">
+          <span className="datum text-fail">NEXT_PUBLIC_PRIVY_APP_ID unset</span>
+          <span className="text-muted"> — login and signing are disabled.</span>
         </div>
         {children}
       </>

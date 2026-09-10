@@ -83,7 +83,7 @@ export default async function LotPage(props: { params: Promise<{ id: string }> }
     return (
       <div className="ticket mx-auto max-w-lg p-8">
         <p className="label mb-2">Lot #{id}</p>
-        <p className="datum text-sm text-[--color-fail]">Could not read this lot from chain.</p>
+        <p className="datum text-sm text-fail">Could not read this lot from chain.</p>
         <p className="label mt-4 leading-relaxed">
           Contract: <span className="datum">{TURMOIL_ADDRESS}</span>
           <br />
@@ -110,7 +110,7 @@ export default async function LotPage(props: { params: Promise<{ id: string }> }
           </div>
           <span
             className={`stamp ${
-              settled ? "text-[--color-pass]" : isSealed ? "text-[--color-oil]" : "text-[--color-muted]"
+              settled ? "text-pass" : isSealed ? "text-oil" : "text-muted"
             }`}
           >
             {settled ? "Settled" : isSealed ? "Sealed" : "Open"}
@@ -118,13 +118,13 @@ export default async function LotPage(props: { params: Promise<{ id: string }> }
         </div>
 
         <p className="label mb-8 break-all">
-          Collector <span className="datum text-[--color-muted]">{collector}</span>
+          Collector <span className="datum text-muted">{collector}</span>
         </p>
 
         <p className="label mb-3">Pickups — every litre, every fryer</p>
-        <div className="perf divide-y divide-[--color-line]">
+        <div className="perf divide-y divide-line">
           {data.batches.length === 0 && (
-            <p className="datum py-4 text-sm text-[--color-muted]">No pickups recorded.</p>
+            <p className="datum py-4 text-sm text-muted">No pickups recorded.</p>
           )}
           {data.batches.map(([batchId, b]) => {
             const [restaurant, , litres, , audited, failed, confirmed] = b;
@@ -143,7 +143,7 @@ export default async function LotPage(props: { params: Promise<{ id: string }> }
                 </div>
                 <p
                   className={`datum shrink-0 pl-4 text-lg ${
-                    failed ? "text-[--color-fail] line-through" : ""
+                    failed ? "text-fail line-through" : ""
                   }`}
                 >
                   {litres.toString()} L
@@ -169,8 +169,8 @@ export default async function LotPage(props: { params: Promise<{ id: string }> }
 
         {settled && (
           <div
-            className={`mt-8 border p-4 text-center ${
-              closes ? "border-[--color-pass] text-[--color-pass]" : "border-[--color-fail] text-[--color-fail]"
+            className={`mt-8 rounded border p-4 text-center ${
+              closes ? "border-pass text-pass" : "border-fail text-fail"
             }`}
           >
             <p className="datum text-sm uppercase tracking-widest">
@@ -185,13 +185,13 @@ export default async function LotPage(props: { params: Promise<{ id: string }> }
         {drawn && (
           <div className="mt-8">
             <p className="label mb-1">Audit seed — drawn after sealing, from Hedera 0x169</p>
-            <p className="datum break-all text-[10px] text-[--color-oil-dim]">{seed.toString(16)}</p>
+            <p className="datum break-all text-[10px] text-oil-dim">{seed.toString(16)}</p>
           </div>
         )}
       </div>
 
       <p className="label mt-4 text-center">
-        <Link href="/" className="hover:text-[--color-paper]">
+        <Link href="/" className="hover:text-paper">
           ← New pickup
         </Link>
       </p>

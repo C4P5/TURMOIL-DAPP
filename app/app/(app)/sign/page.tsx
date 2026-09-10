@@ -101,7 +101,7 @@ function SignInner() {
   }
 
   if (!complete) {
-    return <p className="datum text-[--color-fail]">Incomplete pickup link — scan the QR again.</p>;
+    return <p className="datum text-fail">Incomplete pickup link — scan the QR again.</p>;
   }
 
   return (
@@ -109,7 +109,7 @@ function SignInner() {
       <p className="label mb-1">Pickup confirmation</p>
       <h1 className="mb-8 text-2xl">Did this collection happen?</h1>
 
-      <dl className="perf mb-8 divide-y divide-[--color-line] py-1">
+      <dl className="perf mb-8 divide-y divide-line py-1">
         <Row label="Litres" value={litres!} big />
         <Row label="You receive" value={payout} big />
         <Row label="Collector" value={`${collector!.slice(0, 10)}…${collector!.slice(-6)}`} />
@@ -120,7 +120,7 @@ function SignInner() {
           differ, the signature recovers to the wrong address and attest() reverts
           with BadSignature — which looks identical to forgery. Say so up front. */}
       {authenticated && address && restaurant.toLowerCase() !== address.toLowerCase() && (
-        <p className="datum mb-6 border border-[--color-fail] p-3 text-xs text-[--color-fail]">
+        <p className="datum mb-6 rounded border border-fail bg-fail/10 p-3 text-xs text-fail">
           You are signed in as {address.slice(0, 10)}…{address.slice(-6)}, but this pickup pays{" "}
           {restaurant.slice(0, 10)}…{restaurant.slice(-6)}. Sign out and use the account the
           collector registered.
@@ -128,18 +128,18 @@ function SignInner() {
       )}
 
       {expired ? (
-        <p className="datum text-sm text-[--color-fail]">
+        <p className="datum text-sm text-fail">
           This request expired. Ask the driver for a new QR.
         </p>
       ) : state === "done" ? (
         <div>
-          <p className="stamp mb-4 inline-block text-[--color-pass]">Signed &amp; paid</p>
+          <p className="stamp mb-4 inline-block text-pass">Signed &amp; paid</p>
           <p className="label mb-2">Transaction</p>
           <a
             href={`https://hashscan.io/testnet/transaction/${txHash}`}
             target="_blank"
             rel="noreferrer"
-            className="datum block break-all text-xs text-[--color-oil]"
+            className="datum block break-all text-xs text-oil"
           >
             {txHash}
           </a>
@@ -150,7 +150,7 @@ function SignInner() {
         <>
           <button
             onClick={login}
-            className="datum w-full bg-[--color-oil] px-4 py-3 text-sm uppercase tracking-widest text-[--color-ink]"
+            className="datum w-full rounded bg-oil px-4 py-3 text-sm uppercase tracking-widest text-ink"
           >
             Continue with email
           </button>
@@ -161,19 +161,19 @@ function SignInner() {
           <button
             onClick={confirm}
             disabled={state === "signing" || state === "sending"}
-            className="datum w-full bg-[--color-oil] px-4 py-3 text-sm uppercase tracking-widest text-[--color-ink]"
+            className="datum w-full rounded bg-oil px-4 py-3 text-sm uppercase tracking-widest text-ink"
           >
             {state === "signing" ? "Waiting for your signature…" : state === "sending" ? "Submitting…" : "Yes, confirm and get paid"}
           </button>
           {address && (
-            <p className="datum mt-3 break-all text-center text-[10px] text-[--color-muted]">
+            <p className="datum mt-3 break-all text-center text-[10px] text-muted">
               signing as {address}
             </p>
           )}
         </>
       )}
 
-      {error && <p className="datum mt-4 text-xs text-[--color-fail]">{error}</p>}
+      {error && <p className="datum mt-4 text-xs text-fail">{error}</p>}
     </div>
   );
 }
@@ -182,7 +182,7 @@ function Row({ label, value, big }: { label: string; value: string; big?: boolea
   return (
     <div className="flex items-baseline justify-between py-3">
       <dt className="label">{label}</dt>
-      <dd className={`datum ${big ? "text-xl" : "text-sm text-[--color-muted]"}`}>{value}</dd>
+      <dd className={`datum ${big ? "text-xl" : "text-sm text-muted"}`}>{value}</dd>
     </div>
   );
 }
