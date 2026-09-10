@@ -70,6 +70,23 @@ Palm oil and used cooking oil are chemically similar enough that you cannot reli
 
 The fraud is possible because **a certificate is a claim made by one party about oil nobody else saw.**
 
+### And from 2027, Europe stops accepting that
+
+[**Commission Regulation (EU) 2025/2181**](https://eur-lex.europa.eu/legal-content/EN/TXT/PDF/?uri=CELEX:32025R2181), published 30 October 2025, amends Annexes I, XIV and XV of Regulation (EU) No 142/2011 and rewrites what an importer has to show:
+
+| Requirement | What it means for a supplier |
+|---|---|
+| UCO must come from **approved or registered establishments** in the exporting country | Being clean is no longer enough; you have to be on a list |
+| Backed by a **"fully documented chain of custody, including initial collection and processing all the way to delivery"** | The chain has to start at collection — the fryer — not at the first aggregator |
+| An importer's declaration on the official template (Annex XV, Ch. 22) | Per consignment, not per annual audit |
+| **All UCO imports from officially approved sources — 2027** | A dated deadline, not a consultation |
+
+Read that middle row again, because it is the whole opportunity. **Initial collection is the fryer.** It is the one link no certificate scheme evidences today, and it is the link this project produces a signature for.
+
+So the argument is not that fraud exists somewhere far away. It is that **an origin claim will shortly have to be documented from the first litre, and nobody has an instrument that does it.** A clean supplier needs that instrument as much as a dishonest one needs to avoid it — which is why this is a market rather than a policing exercise.
+
+*Sources: [EUR-Lex 32025R2181](https://eur-lex.europa.eu/legal-content/EN/TXT/PDF/?uri=CELEX:32025R2181) · [QC Intel — EU to require registration of UCO suppliers from 2027](https://www.qcintel.com/biofuels/article/eu-to-require-registration-of-uco-suppliers-from-2027-51947.html) · [ResourceWise — EU tightens rules on UCO imports](https://www.resourcewise.com/blog/eu-tightens-rules-on-uco-imports-implications-for-the-biofuels-market)*
+
 ---
 
 ## The Solution
@@ -352,6 +369,31 @@ The upside was unplanned: a 20-USDC drip every two hours would have capped the d
 
 **Collector bond.** **50% of lot value, and `attest` refuses to record a pickup without it.** The bond is the only thing any slash in this system can ever take, so a bond that doesn't cover the lot it secures makes every enforcement path decoration. A caught fabrication forfeits all of it.
 
+### What the market actually pays
+
+The number in the contract is `pricePerLitre = 248000` — **$0.248 per litre to the restaurant**. Against the trade:
+
+| Leg of the chain | Price | Source |
+|---|---|---|
+| What a generator receives, US benchmark | **$0.026–0.079/L** ($0.10–0.30/gal) | Energy Solutions, *UCO Market 2026*, Jun 2026 |
+| What a generator receives, typical EU practice | **often nothing** — free removal *is* the payment | ibid. |
+| What a plant pays a collector, Brazil | **$0.72/L** | Statledger, *Brazil UCO Market*, Sep 2025 |
+| HoReCa collection cost, Brazil | $0.50–0.55/L | ibid. |
+| UCO DDP Northwest Europe | **€1,040–1,075/t ≈ $0.97–1.06/L** | Fastmarkets, Mar 2026 |
+
+So **$0.248 is three to eight times the going rate to the generator**, and more than the zero most European restaurants get. That is not an estimate of the market price — it is deliberately above it, funded by the spread between what a generator is paid and what a plant pays. Paying a restaurant properly is the acquisition strategy, and it is the reason a restaurant would ever bother scanning a QR.
+
+**Sensitivity, one truck, 40 stops a week at 20 L:**
+
+| | Resale @ $0.72/L | Resale @ $1.00/L |
+|---|---|---|
+| Revenue on 800 L | $576 | $800 |
+| Paid to restaurants (800 × $0.248) | −$198 | −$198 |
+| Truck amortisation | −$109 | −$109 |
+| **Before fuel, labour, insurance** | **+$269/wk** | **+$493/wk** |
+
+**Honest caveats.** These are Brazilian and European prices; no Uruguayan figure is public at any point in the chain. Fuel, labour and insurance are not modelled. And 20 L per stop is the *low* end — a measured Ecuadorean study puts fast-food outlets at 10–24 L/week and larger venues well above that, so the volume assumption is conservative rather than optimistic.
+
 **The cap table, as issued.** 4,000 shares at $10.00 nominal = **$40,000 per unit**, which is roughly what a 0 km collection truck costs. Six decimals, so a share divides to a thousandth — the $10 nominal sets how the cap table reads, not a minimum ticket.
 
 **Where the payment float comes from.** The unit price buys the vehicle. Restaurant payouts come from the **collector's bond**, which `postDeposit` transfers into the contract and `attest` pays out of — so investors never front working capital, and a shortfall hits the collector's margin rather than the raise. That is the residual-claimant rule, in the balance sheet rather than in a promise.
@@ -484,7 +526,13 @@ TURMOIL-DAPP/
 
 ## Real-World Impact & Market Validation
 
-> 🚧 **WIP — field data collection in Montevideo in progress.** Litres per pickup and frequency, who currently collects and whether they pay, what the current disposal receipt physically looks like, and whether Uruguayan restaurants are legally required to document disposal.
+**The problem is international; the pilot is wherever a truck is cheapest to run.** This was built in Montevideo, and Uruguay is a plausible first route — UCO export is legal there, the domestic collector is a state company that pays generators nothing, and there is no public registry of private collectors serving restaurants. But nothing in the contract is Uruguayan. The trade that has the fraud problem, the buyers that have the documentation problem, and the regulation that lands in 2027 are all cross-border. A truck can be parked anywhere.
+
+**Where the demand actually comes from.** Not from restaurants wanting blockchain, and not from anybody's sustainability report. From [EU 2025/2181](https://eur-lex.europa.eu/legal-content/EN/TXT/PDF/?uri=CELEX:32025R2181): after 2027 an exporter selling UCO into Europe needs a documented chain of custody starting at initial collection, from an approved establishment. Every honest exporter in that trade acquires a documentation problem on the same date, and none of them currently has an instrument that evidences the first link.
+
+**What is validated, and what is not.** The prices, volumes and market structure above come from published sources and are cited with dates. What has **not** happened is a conversation with a real restaurant, collector or plant — every counterparty in the demo is simulated, and the strongest evidence here is that the mechanism works on chain, not that anyone has agreed to use it. That gap is the honest limit of a hackathon build, and it is the first thing a pilot would close.
+
+> 🚧 **WIP — a named buyer's quote and a restaurant owner on record. Neither exists yet.**
 
 ---
 
@@ -559,6 +607,9 @@ It was caught by running a review that tried to break the contract, not by readi
 
 - [Transport & Environment — *UCO: The Certified Unknown*](https://www.transportenvironment.org/articles/uco)
 - [Transport & Environment — *Palm oil in disguise?* (POME fraud report, March 2025)](https://www.transportenvironment.org/uploads/files/202504_POME_fraud_Report.pdf)
+- [**Commission Regulation (EU) 2025/2181**](https://eur-lex.europa.eu/legal-content/EN/TXT/PDF/?uri=CELEX:32025R2181) — the 2027 chain-of-custody requirement for imported UCO. The reason this project has a deadline
+- [QC Intel — *EU to require registration of UCO suppliers from 2027*](https://www.qcintel.com/biofuels/article/eu-to-require-registration-of-uco-suppliers-from-2027-51947.html)
+- [ResourceWise — *EU tightens rules on UCO imports*](https://www.resourcewise.com/blog/eu-tightens-rules-on-uco-imports-implications-for-the-biofuels-market)
 - [studioGearUp — *Current POME-based biofuels in EU fall within current production potential*](https://www.studiogearup.com/current-pome-based-biofuels-in-eu-fall-within-current-production-potential/) — the counter-estimate, cited because it disputes us
 - [NDR Panorama 3 — *Betrug mit Biotreibstoffen: "Besser als Drogenhandel"*](https://www.ndr.de/fernsehen/sendungen/panorama3/meldungen/betrug-mit-biotreibstoffen-besser-als-drogenhandel,betrug-biodiesel-hvo-100.html) (German public broadcaster)
 - [OCCRP — *How Biofuels Scams Have Undermined A Flagship EU Climate Policy*](https://www.occrp.org/en/investigation/how-biofuels-scams-have-undermined-a-flagship-eu-climate-policy)
