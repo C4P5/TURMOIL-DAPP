@@ -23,7 +23,7 @@ export const metadata = {
 
 export default function Landing() {
   return (
-    <div className="relative overflow-hidden">
+    <div id="top" className="relative overflow-hidden">
       <Ambience />
 
       <div className="relative z-10">
@@ -106,7 +106,19 @@ function Ambience() {
 function Nav() {
   return (
     <nav className="sticky top-0 z-30 mx-auto flex items-center justify-between px-6 py-5">
-      <span className="pill datum px-5 py-2.5 text-base tracking-[0.28em] text-oil">TURMOIL</span>
+      {/*
+        Doubles as the way back up. The nav is already sticky, so the wordmark is
+        on screen at every scroll position — which makes a separate floating
+        "back to top" button a second control for a job one already does.
+        globals.css sets scroll-behavior: smooth, with a reduced-motion override.
+      */}
+      <a
+        href="#top"
+        aria-label="Back to top"
+        className="pill datum px-5 py-2.5 text-base tracking-[0.28em] text-oil transition-opacity hover:opacity-80"
+      >
+        TURMOIL
+      </a>
       <div className="label absolute left-1/2 hidden -translate-x-1/2 gap-7 md:flex">
         <a href="#crime" className="transition-colors hover:text-paper">
           The fraud
