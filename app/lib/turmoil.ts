@@ -141,6 +141,23 @@ export const TURMOIL_ABI = [
     inputs: [],
     outputs: [{ name: "", type: "uint256" }],
   },
+  {
+    type: "function",
+    name: "isRestaurant",
+    stateMutability: "view",
+    inputs: [{ name: "", type: "address" }],
+    outputs: [{ name: "", type: "bool" }],
+  },
+  {
+    type: "function",
+    name: "setRestaurant",
+    stateMutability: "nonpayable",
+    inputs: [
+      { name: "who", type: "address" },
+      { name: "ok", type: "bool" },
+    ],
+    outputs: [],
+  },
   // Read the settlement token from the contract instead of hardcoding it. payToken
   // is immutable but not universal: this deployment settles in DemoUSDC and the
   // previous one in Circle's USDC. Asking the contract is what makes the restaurant

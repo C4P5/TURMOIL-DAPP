@@ -20,6 +20,30 @@ export default function CollectorPage() {
   const [link, setLink] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [onboarding, setOnboarding] = useState(false);
+  const [onboarded, setOnboarded] = useState<string | null>(null);
+
+  async function onboard() {
+    setError(null);
+    setOnboarded(null);
+    setOnboarding(true);
+    try {
+      const res = await fetch("/api/onboard", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ restaurant }),
+      });
+      const body = await res.json();
+      if (!res.ok) throw new Error(body.error ?? "Onboarding failed");
+      setOnboarded(
+        `Registered ${body.registered}, wallet funded ${body.funded}. They can be paid and can withdraw.`,
+      );
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setOnboarding(false);
+    }
+  }
 
   async function createBatch() {
     setError(null);
@@ -92,8 +116,23 @@ export default function CollectorPage() {
           value={restaurant}
           onChange={(e) => setRestaurant(e.target.value.trim())}
           placeholder="0x…"
-          className="datum mb-5 w-full field px-3 py-2 text-sm"
+          className="datum mb-2 w-full field px-3 py-2 text-sm"
         />
+
+        {/*
+          First visit only. Registers the restaurant and puts one HBAR in their
+          wallet so they can move what they earn — signing a pickup is gasless,
+          withdrawing is not. Idempotent, so pressing it twice costs a read.
+        */}
+        <button
+          onClick={onboard}
+          disabled={onboarding || !restaurant}
+          className="label mb-5 w-full rounded border border-line px-3 py-2 text-paper transition-colors hover:border-oil hover:text-oil disabled:opacity-40"
+        >
+          {onboarding ? "Onboarding…" : "New restaurant? Register + activate wallet"}
+        </button>
+
+        {onboarded && <p className="label mb-5 text-oil">{onboarded}</p>}
 
         <label className="label mb-1 block">Litres collected</label>
         <input
