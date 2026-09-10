@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { usePrivy } from "@privy-io/react-auth";
 import { QRCodeSVG } from "qrcode.react";
 import { useSignBatch } from "@/lib/useSignBatch";
@@ -17,6 +17,28 @@ export default function CollectorPage() {
 
   const [restaurant, setRestaurant] = useState("");
   const [litres, setLitres] = useState("40");
+
+  /*
+    The landing's widget links here as /collect?litres=N, so the driver arrives
+    on the figure the visitor just typed instead of a reset default.
+
+    Read on mount rather than through useSearchParams: that hook would force this
+    whole page into a Suspense boundary, and reading window.location in the
+    useState initialiser would render "40" on the server and something else on
+    the client — a hydration mismatch. An effect costs one frame and nothing else.
+  */
+  useEffect(() => {
+    const q = new URLSearchParams(window.location.search).get("litres");
+    /*
+      One-shot read at mount, not a render loop. The rule's usual fix,
+      useSearchParams, needs a Suspense boundary in a prerendered route (Next
+      docs, layouts-and-pages, "What to use and when"), and a useState
+      initialiser reading window would render "40" on the server and something
+      else on the client. Both cost more than the single frame this costs.
+    */
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (q && /^[1-9]\d{0,5}$/.test(q)) setLitres(q);
+  }, []);
   const [link, setLink] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);

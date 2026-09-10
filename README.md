@@ -60,7 +60,7 @@ The numbers, from the people who investigate this for a living:
 
 | Finding | Date | Source |
 |---|---|---|
-| **26 of 27 EU member states** back a proposed **2.5-year suspension** of ISCC recognition for waste-based biofuels | Mar 2025 – Mar 2026 | ENGINE / Varuna Marine |
+| EU member states tabled a proposed **2.5-year suspension** of ISCC recognition for waste-based biofuels. ISCC states **no vote was taken** and no decision made at the March 2025 meeting — it remains a live proposal, not a decision | Mar 2025 | [QC Intel](https://www.qcintel.com/biofuels/article/eu-countries-propose-plan-to-suspend-iscc-waste-biofuel-certification-sources-38517.html) · [ISCC's response](https://www.iscc-system.org/news/on-the-recent-discussions-on-iscc-eu-certification-for-waste-based-biofuels/) |
 | ISCC **withdrew or suspended 7 certificates** after a mislabelling investigation; 6 revoked, **3 holders China-based** | 2024 | [QC Intel](https://www.qcintel.com/biofuels/article/iscc-withdraws-certification-from-uco-supplier-accused-of-non-delivery-33218.html) |
 | Germany's **BLE linked two companies to certification fraud** | May 2025 | [S&P Global](https://www.spglobal.com/energy/en/news-research/latest-news/crude-oil/050725-german-biofuels-regulator-links-two-companies-to-certification-fraud) |
 | European Commission opened an **anti-dumping investigation**, plus a probe into Indonesian biodiesel routed via China to evade duties | Dec 2023 | [Fastmarkets](https://www.fastmarkets.com/insights/ec-confirms-china-eu-waste-biofuel-probe/) |

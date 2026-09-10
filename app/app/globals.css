@@ -47,6 +47,27 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+/*
+  The in-page nav links travel instead of teleporting. An instant jump between
+  two dark sections reads as a page swap — the viewer loses their place and has
+  no idea they moved down rather than sideways. Scrolling shows the distance.
+*/
+html {
+  scroll-behavior: smooth;
+}
+
+/*
+  ...and every anchor target stops clear of the sticky nav. Without this the
+  section's own heading lands underneath the header, so the link appears to
+  overshoot to the body copy.
+*/
+section[id] {
+  /* Small, because the sections already carry py-24 of their own. Setting this
+     to the nav's height stacks the two and lands a third of a viewport of empty
+     space above the heading, which reads as an overshoot rather than an arrival. */
+  scroll-margin-top: 1.5rem;
+}
+
 /* ---------------------------------------------------------------------------
    Forensic layer — used by the receipt, the collector tool and the sign screen.
    Deliberately flat: no blur, no glow, nothing that could be mistaken for
@@ -238,6 +259,104 @@ body {
   opacity: 0.5;
 }
 
+/*
+  Centred radial vignette. Replaces the corner glows, which photographed as a
+  light leak rather than as atmosphere — asymmetric, clipped by the viewport
+  edge, and pulling the eye away from the middle of a composition whose whole
+  point is the middle. Dark at the edges, warm at the centre, like a lamp over a
+  workbench.
+*/
+.vignette {
+  /* The bright core sits behind the headline, not behind the widget. Light
+     directly under a data panel flattens its contrast — the figures have to stay
+     readable, and the glow's job is to lift the type above it. */
+  background:
+    radial-gradient(40% 26% at 50% 31%, rgb(255 185 80 / 0.26), transparent 70%),
+    radial-gradient(80% 50% at 50% 30%, rgb(240 160 32 / 0.13), transparent 74%),
+    radial-gradient(120% 70% at 50% 0%, rgb(255 190 90 / 0.08), transparent 62%),
+    radial-gradient(100% 55% at 50% 100%, rgb(240 160 32 / 0.05), transparent 68%);
+}
+
+/*
+  The marked word. SaucerSwap boxes one word of the headline and lights it; it
+  is what turns a sentence into a logo-like lockup. Ours glows amber from inside
+  the box as well as outside, so the word looks lit rather than outlined.
+*/
+.mark {
+  display: inline-block;
+  padding: 0 0.22em 0.05em;
+  border-radius: var(--radius);
+  color: var(--color-oil);
+  border: 1px solid rgb(240 160 32 / 0.45);
+  background: rgb(240 160 32 / 0.07);
+  box-shadow:
+    0 0 70px rgb(240 160 32 / 0.3),
+    inset 0 0 34px rgb(240 160 32 / 0.11);
+}
+
+/* Floating nav capsule. */
+.pill {
+  border-radius: 9999px;
+  background: rgb(255 255 255 / 0.045);
+  backdrop-filter: blur(18px) saturate(140%);
+  -webkit-backdrop-filter: blur(18px) saturate(140%);
+  border: 1px solid rgb(240 160 32 / 0.16);
+}
+
+/*
+  A pill that lights on hover, borrowing the CTA's glow without borrowing its
+  fill. The text colour deliberately does not change: these are secondary
+  destinations, and recolouring the label on hover would make them compete with
+  the amber primary sitting right beside them. The light does the signalling.
+*/
+.pill-lit {
+  transition:
+    background-color 220ms ease,
+    border-color 220ms ease,
+    box-shadow 220ms ease;
+}
+
+.pill-lit:hover {
+  background: rgb(255 255 255 / 0.085);
+  border-color: rgb(240 160 32 / 0.45);
+  box-shadow:
+    0 0 34px rgb(240 160 32 / 0.32),
+    inset 0 1px 0 rgb(255 255 255 / 0.1);
+}
+
+/*
+  A glass panel carrying a little more light than the default pour. Used where a
+  card is a peer of another lit element and would otherwise read as switched off
+  next to it. Declared after .glass so it wins on the fill.
+*/
+.bright {
+  background: linear-gradient(180deg, rgb(255 255 255 / 0.09), rgb(255 255 255 / 0.035));
+}
+
+/*
+  The primary call to action. A solid amber pill that emits light — the one
+  element on the page allowed to glow this hard, because in a centred
+  composition the eye needs somewhere to land.
+*/
+.cta {
+  border-radius: 9999px;
+  background: var(--color-oil);
+  color: var(--color-ink);
+  box-shadow:
+    0 0 48px rgb(240 160 32 / 0.45),
+    inset 0 1px 0 rgb(255 255 255 / 0.4);
+  transition:
+    box-shadow 220ms ease,
+    transform 220ms ease;
+}
+
+.cta:hover {
+  transform: translateY(-1px);
+  box-shadow:
+    0 0 72px rgb(240 160 32 / 0.62),
+    inset 0 1px 0 rgb(255 255 255 / 0.4);
+}
+
 /* Display type for the landing. Tight tracking at large sizes, because
    Space Grotesk's default spacing is set for text, not headlines. */
 .display {
@@ -270,8 +389,14 @@ button:disabled {
   color: var(--color-ink);
 }
 
-/* Anyone who has asked not to be moved is not moved. */
+/* Anyone who has asked not to be moved is not moved. Long smooth scrolls are a
+   vestibular trigger, so the jump comes back here — instant is the accessible
+   behaviour, not the lazy one. */
 @media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
   *,
   *::before,
   *::after {
