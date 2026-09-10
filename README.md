@@ -101,7 +101,7 @@ TURMOIL builds the receipt - Incentivizes small businesses, and *ackchyually* co
 ### Why This Qualifies
 
 - **A real, documented, unsolved market crime** — Pretty self-explanatory. Every figure above is sourced and dated.
-- **ERC-3643, not a hand-rolled NFT.** A truck paying revenue to holders is a security. We issued it on rails built for such — identity registry, compliance module, transfer restrictions — rather than pretending it isn't one. Because that's the right thing to do. 
+- **ERC-3643, not a hand-rolled NFT.** A truck paying revenue to holders is a security, so we issued it as one — through Hedera's Asset Tokenization Studio, with an allow list, an internal KYC registry and a registered credential issuer. It is live at [`0.0.10452566`](https://hashscan.io/testnet/contract/0.0.10452566) and it refuses transfers to wallets that have not been approved. Not "compliance-ready": compliance that already said no.
 - **Hedera-native, not a copy-paste EVM deploy.** Audit sampling uses Hedera's PRNG system contract at `0x169` ([HIP-351](https://hips.hedera.com/hip/hip-351)) — no oracle, no VRF wait.
 - **Gasless for the people who don't want a wallet.** Restaurants sign typed data; they never hold HBAR or send a transaction.
 - **The economics of cheating are negative on purpose**, The arithmetic is further down in this README.
@@ -285,7 +285,23 @@ What the contract enforces: *every litre carries signatures from two distinct re
 
 Every economic parameter — price per litre, tolerance, sample rate, deposit size — is owner-tunable, because the payoff they have to beat moves.
 
-**Truck share:** a separate ERC-3643 issued through Hedera's Asset Tokenization Studio, which also handles distributions to holders. `Turmoil.sol` does not reference it. 🚧 *not yet issued*
+**Truck share:** a separate ERC-3643 issued through Hedera's Asset Tokenization Studio, which also handles distributions to holders. `Turmoil.sol` does not reference it — deliberately. The provenance contract has no opinion about who owns the truck, and the security has no opinion about where oil came from.
+
+### The truck share — Hedera testnet
+
+| | |
+|---|---|
+| `TURMOIL UNIT 001` (`TRUCK1`) | [`0.0.10452566`](https://hashscan.io/testnet/contract/0.0.10452566) · `0x26b8a054df08c26b692615725200815feaadf8b2` |
+| Standard | ERC-3643 via ATS, diamond-resolver proxy |
+| Supply | **4,000 shares**, 6 decimals, $10.00 nominal → **$40,000** per unit |
+| ISIN | `UYTURMOIL015` |
+| Regulation | Reg S — offshore offering; sanctioned jurisdictions blocked |
+| Compliance | Allow list (`getControlListType() == true`), internal KYC, registered SSI credential issuer, `isControllable() == true` |
+| Rights | Information, liquidation and **redemption** on; **put right deliberately off** — see below |
+
+**Redemption on, put right off — that asymmetry is the whole design.** Redemption lets the issuer buy shares back out of revenue that actually arrived. A put right would let a holder *force* that buyback, which is a floor price by another name and an obligation the truck's revenue may not be able to meet. Enabling it would have contradicted this README two sections down. The issuer *may* buy back; nobody *must*.
+
+**What is not wired, stated plainly.** ERC-3643 also defines an on-chain `identityRegistry` and a modular `compliance` contract. On this token both read `0x0`, because Hedera publishes no deployed identity-registry or compliance infrastructure for testnet and pointing them at a non-existent address would be worse than leaving them unset. The restrictions above are enforced by ATS's own allow list and internal KYC registry — which is what refused the transfer — not by an external ONCHAINID registry. Both have setters, so wiring them is configuration, not a redeploy.
 
 ### Deployed — Hedera testnet (chain 296)
 
@@ -323,6 +339,8 @@ The upside was unplanned: a 20-USDC drip every two hours would have capped the d
 | Mass balance is enforced arithmetically | 20 L attested against an 18 L plant receipt → allowed `(18×10200)/10000 = 18`, shortfall 2 L, **496,000 slashed** from the bond. The plant address stored is the recovered signer, not a field we set |
 | An unanswered audit costs the whole bond | Batch 0 went unconfirmed past the challenge window → `flagAudit` burned `deposit` **500.504 → 0** |
 | **A confirmed batch cannot be flagged** | Batch 1 was sampled and confirmed by its restaurant's own signature; `flagAudit` then reverted `AlreadyConfirmed` (`0x5f8a9c0b`) and the bond stayed whole. This is the leg that makes the restaurants a check on us rather than the other way round |
+| The truck share is a real security, not a badge | `0.0.10452566` issued through ATS in allow-list mode. On creation `getControlListCount()` was **0** and the issuer's own redeem was refused — the token permitted nobody, including us, until an account was explicitly approved. After `addToControlList`, the count is **1** |
+| **Transfer restrictions actually restrict** | A transfer of one share to an unapproved wallet reverts with `AccountIsBlocked(0x936D…6424)`. The 4,000 shares exist and cannot move to anyone who has not been approved and KYC'd |
 
 ---
 
@@ -332,7 +350,11 @@ The upside was unplanned: a 20-USDC drip every two hours would have capped the d
 
 **Collector bond.** **50% of lot value, and `attest` refuses to record a pickup without it.** The bond is the only thing any slash in this system can ever take, so a bond that doesn't cover the lot it secures makes every enforcement path decoration. A caught fabrication forfeits all of it.
 
-> 🚧 **WIP — shares per truck, real truck acquisition cost, buyback percentage. Pending field data.**
+**The cap table, as issued.** 4,000 shares at $10.00 nominal = **$40,000 per unit**, which is roughly what a 0 km collection truck costs. Six decimals, so a share divides to a thousandth — the $10 nominal sets how the cap table reads, not a minimum ticket.
+
+**Where the payment float comes from.** The unit price buys the vehicle. Restaurant payouts come from the **collector's bond**, which `postDeposit` transfers into the contract and `attest` pays out of — so investors never front working capital, and a shortfall hits the collector's margin rather than the raise. That is the residual-claimant rule, in the balance sheet rather than in a promise.
+
+> 🚧 **WIP — buyback percentage. Pending field data.**
 
 ---
 
@@ -345,7 +367,7 @@ The upside was unplanned: a 20-USDC drip every two hours would have capped the d
 | HTS — USDC | The token the contract is *designed* to settle in; verified `FUNGIBLE_COMMON`, 6 decimals, no KYC key, and bound by an earlier deployment | [`0.0.429274`](https://hashscan.io/testnet/token/0.0.429274) — unobtainable on testnet, see above |
 | Settlement in this demo | `DemoUSDC`, same 6 decimals, deployed by the same script | [`0.0.10448306`](https://hashscan.io/testnet/contract/0.0.10448306) |
 | HTS auto-association | Restaurants receive USDC with **no association transaction** | `maxAutomaticTokenAssociations = -1` (HIP-904), on both the contract and the embedded wallet |
-| Asset Tokenization Studio | ERC-3643 truck token issuance | 🚧 not yet issued |
+| Asset Tokenization Studio | ERC-3643 truck share, allow list + internal KYC + SSI issuer registry | [`0.0.10452566`](https://hashscan.io/testnet/contract/0.0.10452566) — 4,000 shares issued |
 | JSON-RPC relay | Frontend contract reads, relayed `attest` writes | `testnet.hashio.io/api` |
 | Mirror Node | Deployment, account and token verification during the build | `testnet.mirrornode.hedera.com` |
 
