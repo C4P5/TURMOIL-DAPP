@@ -35,6 +35,7 @@ export default function Landing() {
         <Arithmetic />
         <Receipt />
         <Flow />
+        <Trucks />
         <Stack />
         <Close />
       </div>
@@ -535,11 +536,21 @@ function Row({ n, k, f, p, ev }: { n: string; k: string; f: string; p: string; e
 /* -------------------------------------------------------------------------- */
 
 function Flow() {
-  const steps = [
+  /* An explicit type, because a heterogeneous array literal infers a union and
+     s.status would not typecheck on the members that lack it. */
+  const steps: { who: string; what: string; gets: string; status?: string; href?: string }[] = [
     { who: "Restaurant", what: "signs for the oil it handed over", gets: "paid instantly, in USDC" },
     { who: "Collector", what: "signs, posts a bond, carries the lot", gets: "bears every shortfall" },
     { who: "Plant", what: "signs for the weight on the scale", gets: "pays for what it received" },
-    { who: "Investor", what: "holds a compliance-gated share of the truck", gets: "paid from real revenue" },
+    {
+      who: "Investor",
+      what: "holds a compliance-gated share of the truck",
+      /* Was "paid from real revenue" — present tense for something that has never
+         run. The share and its refusals are live; the payout is not. */
+      gets: "paid only out of revenue received",
+      status: "designed, not built",
+      href: "#trucks",
+    },
   ];
 
   return (
@@ -557,10 +568,93 @@ function Flow() {
             <p className="mb-3 text-lg">{s.who}</p>
             <p className="mb-5 leading-relaxed text-muted">{s.what}</p>
             <p className="label border-t border-line pt-4">{s.gets}</p>
+            {s.status && <p className="label mt-2 text-oil-dim">{s.status}</p>}
+            {s.href && (
+              <a href={s.href} className="label mt-3 inline-block transition-colors hover:text-oil">
+                See the share ↓
+              </a>
+            )}
           </div>
         ))}
       </div>
     </section>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+
+/*
+  The other half of the product, and the one a spec row cannot carry. Until now
+  the truck share appeared on this page twice — as a single evidence card and as
+  a contract id — which asks the reader to already know what ERC-3643 is and why
+  a share of a van is not a utility token.
+
+  The page's honesty discipline applies hardest here, because this token has
+  already produced two overstatements that had to be retracted: the README once
+  claimed an identity registry and a compliance module that both read 0x0, and
+  the landing once asserted all five trust layers in the present tense. So every
+  figure below is one that can be read back off the token, and what is not wired
+  is set in the same size as what is.
+*/
+function Trucks() {
+  return (
+    <section id="trucks" className="mx-auto max-w-6xl px-6 py-24">
+      <SectionHead
+        eyebrow="The other half"
+        title="A truck is an asset. A share of one is a security."
+        lede="Collection needs capital before it earns anything — a van, a pump, a route. That is ordinary asset finance, and dressing it up as a utility token would only make it an unregistered security. So the share is issued as ERC-3643 through Hedera's Asset Tokenization Studio, carrying the transfer restrictions a security actually has."
+      />
+
+      <div className="mt-14 grid gap-3 md:grid-cols-3">
+        <div className="glass sheen lift bright p-7 md:col-span-2 md:p-8">
+          <p className="label mb-6">TURMOIL UNIT 001 · TRUCK1</p>
+          <dl className="grid gap-x-10 gap-y-1 sm:grid-cols-2">
+            <Spec k="Shares issued" v="4,000" />
+            <Spec k="Nominal value" v="$10.00" />
+            <Spec k="Raise per unit" v="$40,000" />
+            <Spec k="ISIN" v="UYTURMOIL015" />
+            <Spec k="Offering" v="Regulation S" />
+            <Spec k="Decimals" v="6" />
+          </dl>
+        </div>
+
+        <div className="glass sheen lift bright p-7">
+          <p className="mb-3 text-lg">It has already refused someone</p>
+          <p className="leading-relaxed text-muted">
+            At creation the allow list held nobody — <span className="datum">getControlListCount()</span> was 0 — and the
+            issuer&rsquo;s own redeem was refused by their own token. After approval it
+            succeeds. A transfer to an unapproved wallet still reverts{" "}
+            <span className="datum">AccountIsBlocked</span>.
+          </p>
+        </div>
+      </div>
+
+      <div className="glass sheen mt-3 p-7 md:p-8">
+        <p className="label mb-5">What is not wired</p>
+        <p className="max-w-4xl leading-relaxed text-muted">
+          <span className="datum">identityRegistry()</span> and <span className="datum">compliance()</span> both read{" "}
+          <span className="datum">0x0</span>. Hedera publishes no deployed identity-registry or compliance
+          infrastructure for testnet, and pointing them at an address that does not exist would
+          be worse than leaving them unset. The restrictions above come from the studio&rsquo;s own
+          allow list, internal KYC and registered issuer instead — all three live, all three
+          exercised. Both fields have setters, so wiring them is configuration, not a redeploy.
+        </p>
+        <p className="mt-5 max-w-4xl leading-relaxed text-muted">
+          Paying revenue out to holders is{" "}
+          <span className="text-paper">designed, not built</span>. Distribution is the studio&rsquo;s job rather
+          than <span className="datum">Turmoil.sol</span>&rsquo;s, and no distribution has run.
+        </p>
+      </div>
+    </section>
+  );
+}
+
+function Spec({ k, v }: { k: string; v: string }) {
+  return (
+    <div className="flex items-baseline justify-between gap-4 border-b border-line py-3">
+      <dt className="label">{k}</dt>
+      <dd className="datum text-lg">{v}</dd>
+    </div>
   );
 }
 
