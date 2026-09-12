@@ -172,8 +172,9 @@ function Hero() {
       </h1>
 
       <p className="mt-9 max-w-2xl text-lg leading-relaxed text-muted md:text-xl">
-        Eighty percent of Europe&rsquo;s used cooking oil is suspected fraud. Ours is signed
-        twice, weighed at the plant, and audited at random.
+        From 2027, Europe requires used cooking oil to carry a documented chain of custody
+        starting at collection. Collection is the fryer. Ours is signed twice, weighed at the
+        plant, and audited at random.
       </p>
 
       <PickupWidget />
@@ -292,9 +293,9 @@ function Deployed({ name, id, note }: { name: string; id: string; note: string }
 const CRIME = [
   {
     figure: "80%",
-    body: "of the used cooking oil the EU imported in 2022 is suspected to be mislabelled virgin palm oil.",
-    source: "Transport & Environment",
-    href: "https://www.transportenvironment.org/articles/uco",
+    body: "of the used cooking oil Europe burns is imported, about 60% of it from China. The chain of custody starts outside EU jurisdiction.",
+    source: "Transport & Environment, Dec 2023",
+    href: "https://www.transportenvironment.org/articles/80-of-europes-used-cooking-oil-now-imported-raising-concerns-over-fraud-study",
   },
   {
     figure: "1.8 Mt",
@@ -401,7 +402,7 @@ const LAYERS = [
   {
     tag: "L3",
     name: "Revenue-gated payout",
-    body: "Truck-token holders are paid only out of stablecoin the system actually received. Inflating volume cannot manufacture a distribution.",
+    body: "Truck-token holders are paid only out of stablecoin the system actually received. Inflating volume cannot manufacture a distribution. One dividend has been declared on chain and paid by hand; the gating itself is not automated.",
     kills: "Inflation stops paying.",
     status: "designed",
   },
@@ -600,9 +601,11 @@ function Trucks() {
           exercised. Both fields have setters, so wiring them is configuration, not a redeploy.
         </p>
         <p className="mt-5 max-w-4xl leading-relaxed text-muted">
-          Paying revenue out to holders is{" "}
-          <span className="text-paper">designed, not built</span>. Distribution is the studio&rsquo;s job rather
-          than <span className="datum">Turmoil.sol</span>&rsquo;s, and no distribution has run.
+          A dividend has now run: 400 shares transferred to a KYC&rsquo;d holder,{" "}
+          <span className="datum">setDividend</span> recorded on chain, and the entitlement read
+          back at the record date. The payment itself was a manual USDC transfer. Automated
+          pro-rata distribution is the studio&rsquo;s Mass Payout service, which we did not deploy,
+          so that half stays <span className="text-paper">designed, not built</span>.
         </p>
       </div>
     </section>

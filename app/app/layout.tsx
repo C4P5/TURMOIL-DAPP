@@ -28,7 +28,7 @@ const plexMono = IBM_Plex_Mono({
 export const metadata: Metadata = {
   title: "TURMOIL — provable used cooking oil",
   description:
-    "Eighty percent of the used cooking oil Europe imports is suspected to be virgin palm oil. TURMOIL makes the other twenty percent provable — two signatures per pickup, a mass balance at the plant, and a random audit that slashes a bond.",
+    "From 2027 Europe requires used cooking oil to carry a documented chain of custody starting at collection. TURMOIL signs every pickup twice, weighs the load at the plant, and audits a random sample against the restaurants themselves.",
 };
 
 /*
