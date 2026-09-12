@@ -6,6 +6,8 @@ import { createWalletClient, custom, isAddress } from "viem";
 import { publicClient } from "@/lib/publicClient";
 import { hederaTestnet } from "@/lib/chain";
 import { ERC20_ABI, TURMOIL_ABI, TURMOIL_ADDRESS, formatUsdc } from "@/lib/turmoil";
+import { ResidualCards } from "@/app/_components/residual-cards";
+import { FlowCards } from "@/app/_components/flow-cards";
 
 /**
  * Restaurant view. The other half of the split: a driver runs /collect, an owner
@@ -15,10 +17,20 @@ import { ERC20_ABI, TURMOIL_ABI, TURMOIL_ADDRESS, formatUsdc } from "@/lib/turmo
  * pays the restaurant in the same transaction that records the pickup, straight
  * to their own wallet — so what this page shows is simply that wallet's token
  * balance. The money was never ours to hold.
+ *
+ * The page opens on the ask, not on the money: a real operation starts when a
+ * business says the drum is full. Registration and requesting are the same
+ * control at two stages of one relationship — you cannot ask for a truck before
+ * the operator knows who you are, and once they do, asking is one tap.
  */
 
 type Pickup = { batchId: number; litres: bigint; paid: bigint; lotId: number };
-type View = { token: `0x${string}`; balance: bigint; pickups: Pickup[] };
+type View = {
+  token: `0x${string}`;
+  balance: bigint;
+  pickups: Pickup[];
+  registered: boolean;
+};
 
 /**
  * Pure loader, deliberately outside the component: it reads and returns, and
@@ -33,7 +45,7 @@ async function loadRestaurant(address: `0x${string}`): Promise<View> {
     functionName: "payToken",
   })) as `0x${string}`;
 
-  const [balance, count, price] = await Promise.all([
+  const [balance, count, price, registered] = await Promise.all([
     publicClient.readContract({
       address: token,
       abi: ERC20_ABI,
@@ -50,6 +62,12 @@ async function loadRestaurant(address: `0x${string}`): Promise<View> {
       abi: TURMOIL_ABI,
       functionName: "pricePerLitre",
     }) as Promise<bigint>,
+    publicClient.readContract({
+      address: TURMOIL_ADDRESS,
+      abi: TURMOIL_ABI,
+      functionName: "isRestaurant",
+      args: [address],
+    }) as Promise<boolean>,
   ]);
 
   // ponytail: read batches directly rather than scanning logs. `restaurant` is not
@@ -74,11 +92,11 @@ async function loadRestaurant(address: `0x${string}`): Promise<View> {
     }
   }
 
-  return { token, balance, pickups: pickups.reverse() };
+  return { token, balance, pickups: pickups.reverse(), registered };
 }
 
 export default function RestaurantPage() {
-  const { ready, authenticated, login, logout } = usePrivy();
+  const { ready, authenticated, login, logout, getAccessToken } = usePrivy();
   const { wallets } = useWallets();
   // Same rule as useSignBatch: never wallets[0]. A browser extension puts itself
   // first, and the owner would be shown a stranger's balance.
@@ -92,12 +110,65 @@ export default function RestaurantPage() {
   const [error, setError] = useState<string | null>(null);
   const [txHash, setTxHash] = useState<string | null>(null);
 
+  // The ask — registration and pickup requests share one control.
+  const [askLitres, setAskLitres] = useState("40");
+  const [asking, setAsking] = useState(false);
+  const [asked, setAsked] = useState<string | null>(null);
+  const [askError, setAskError] = useState<string | null>(null);
+
   useEffect(() => {
     if (!address) return;
     loadRestaurant(address)
       .then(setView)
       .catch((e) => setError(e instanceof Error ? e.message : String(e)));
   }, [address]);
+
+  /** First contact: the operator registers this wallet and activates it. */
+  async function register() {
+    if (!address) return;
+    setAskError(null);
+    setAsking(true);
+    try {
+      const res = await fetch("/api/onboard", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ restaurant: address }),
+      });
+      const body = await res.json();
+      if (!res.ok) throw new Error(body.error ?? "Registration failed");
+      setView(await loadRestaurant(address));
+    } catch (e) {
+      setAskError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setAsking(false);
+    }
+  }
+
+  /** The step the whole operation starts from. */
+  async function requestPickup() {
+    if (!address) return;
+    setAskError(null);
+    setAsking(true);
+    try {
+      const token = await getAccessToken();
+      const res = await fetch("/api/pickup-request", {
+        method: "POST",
+        headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
+        body: JSON.stringify({ restaurant: address, litres: Number(askLitres) }),
+      });
+      const body = await res.json();
+      if (!res.ok) throw new Error(body.error ?? "Could not send the request");
+      setAsked(
+        body.updated
+          ? `Updated — the driver will collect about ${askLitres} litres.`
+          : `Requested — a truck will come for about ${askLitres} litres.`,
+      );
+    } catch (e) {
+      setAskError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setAsking(false);
+    }
+  }
 
   async function withdraw() {
     if (!wallet || !address || !view) return;
@@ -157,29 +228,88 @@ export default function RestaurantPage() {
     return (
       <div className="ticket max-w-md p-8">
         <p className="label mb-2">Restaurant</p>
-        <h1 className="mb-6 text-2xl">Sign in to see what you have earned</h1>
+        <h1 className="mb-6 text-2xl">Sign in to ask for a pickup</h1>
         <button
           onClick={login}
           className="datum w-full rounded bg-oil px-4 py-3 text-sm uppercase tracking-widest text-ink"
         >
           Sign in with email
         </button>
+        <p className="label mt-3">No wallet, no app, no fees.</p>
       </div>
     );
   }
 
   return (
     <div className="grid gap-8 md:grid-cols-2">
-      <section className="ticket p-6">
-        <div className="mb-6 flex items-baseline justify-between">
-          <p className="label">Restaurant</p>
+      {/*
+        The ask sits above the money on purpose. A restaurant opens this screen
+        because the drum is full, not because it wants to check a balance — and
+        the same control carries them from "nobody knows me" to "a truck is
+        coming", which is the whole onboarding story in one button.
+      */}
+      <section className="ticket p-6 md:col-span-2">
+        <div className="mb-5 flex items-baseline justify-between">
+          <p className="label">Your oil</p>
           <button onClick={logout} className="label hover:text-paper">
             Sign out
           </button>
         </div>
 
-        <p className="datum mb-6 break-all text-xs text-muted">{address}</p>
+        {view === null ? (
+          <p className="label">reading…</p>
+        ) : !view.registered ? (
+          <>
+            <h1 className="mb-3 text-2xl">Get set up to sell your used oil</h1>
+            <p className="mb-6 max-w-2xl leading-relaxed text-muted">
+              One tap registers this business with the operator and activates your wallet, so a
+              truck can come and you can be paid for what you hand over.
+            </p>
+            <button
+              onClick={register}
+              disabled={asking}
+              className="datum rounded bg-oil px-6 py-3 text-sm uppercase tracking-widest text-ink disabled:opacity-40"
+            >
+              {asking ? "Setting up…" : "Register this restaurant"}
+            </button>
+          </>
+        ) : (
+          <>
+            <h1 className="mb-3 text-2xl">Ask for a pickup</h1>
+            <p className="mb-6 max-w-2xl leading-relaxed text-muted">
+              Tell the operator roughly how much you have. A driver measures it on arrival, and the
+              litres you both sign for are the litres you are paid for.
+            </p>
+            <div className="flex flex-wrap items-end gap-4">
+              <div>
+                <label className="label mb-1 block" htmlFor="ask">
+                  Roughly how many litres
+                </label>
+                <input
+                  id="ask"
+                  value={askLitres}
+                  onChange={(e) => setAskLitres(e.target.value.replace(/\D/g, ""))}
+                  inputMode="numeric"
+                  className="datum field w-40 px-3 py-2 text-2xl"
+                />
+              </div>
+              <button
+                onClick={requestPickup}
+                disabled={asking || !askLitres}
+                className="datum rounded bg-oil px-6 py-3 text-sm uppercase tracking-widest text-ink disabled:opacity-40"
+              >
+                {asking ? "Sending…" : "Request a pickup"}
+              </button>
+            </div>
+            {asked && <p className="label mt-4 text-oil">{asked}</p>}
+          </>
+        )}
 
+        {askError && <p className="datum mt-4 text-xs text-fail">{askError}</p>}
+        <p className="datum mt-6 break-all text-xs text-muted">{address}</p>
+      </section>
+
+      <section className="ticket p-6">
         <p className="label mb-1">Your balance</p>
         <p className="datum mb-6 text-4xl">
           {view === null ? "reading…" : `$${formatUsdc(view.balance)}`}{" "}
@@ -265,6 +395,16 @@ export default function RestaurantPage() {
           </table>
         )}
       </section>
+
+      <FlowCards />
+
+      {/* Why the money is already yours, on the screen where that matters. The
+          landing made this argument to visitors; it belongs here, to the person
+          holding the wallet. */}
+      <ResidualCards
+        roles={["restaurant", "collector"]}
+        note="You are paid the moment both signatures land, because nobody waits a week for eleven dollars. If the plant later weighs less than the lot claimed, that gap comes out of the collector's bond — never out of what you were already paid."
+      />
     </div>
   );
 }

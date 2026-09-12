@@ -6,6 +6,7 @@ import { usePrivy } from "@privy-io/react-auth";
 import { useSignBatch } from "@/lib/useSignBatch";
 import { publicClient } from "@/lib/publicClient";
 import { formatUsdc, TURMOIL_ABI, TURMOIL_ADDRESS } from "@/lib/turmoil";
+import { labelFor } from "@/lib/restaurants";
 
 /** Module scope, so the clock read is outside React's render purity rules. */
 function isExpired(deadline: string | null): boolean {
@@ -107,13 +108,25 @@ function SignInner() {
   return (
     <div className="ticket mx-auto max-w-md p-8">
       <p className="label mb-1">Pickup confirmation</p>
-      <h1 className="mb-8 text-2xl">Did this collection happen?</h1>
+      <h1 className="mb-5 text-2xl">Did this collection happen?</h1>
+
+      {/*
+        A mentor's first finding, and the sharpest one: the mechanics were clear
+        and the POWER was not. An owner who does not know that their signature is
+        what releases the collector's money has no reason to care whether the
+        number is right. Say it before the amount, not after.
+      */}
+      <p className="mb-8 leading-relaxed text-muted">
+        Your signature is what proves this pickup was real. Without it the collector cannot record
+        the litres and cannot be paid for them — and nobody can add your oil to a load you never
+        handed over.
+      </p>
 
       <dl className="perf mb-8 divide-y divide-line py-1">
         <Row label="Litres" value={litres!} big />
         <Row label="You receive" value={payout} big />
-        <Row label="Collector" value={`${collector!.slice(0, 10)}…${collector!.slice(-6)}`} />
-        <Row label="Your account" value={restaurant.slice(0, 10) + "…" + restaurant.slice(-6)} />
+        <Row label="Collector" value="TURMOIL Collections" />
+        <Row label="Your account" value={labelFor(restaurant)} />
       </dl>
 
       {/* The URL names who is being paid; the wallet decides who signs. If they

@@ -34,7 +34,6 @@ export default function Landing() {
         <Mechanism />
         <Arithmetic />
         <Receipt />
-        <Flow />
         <Trucks />
         <Stack />
         <Close />
@@ -535,51 +534,12 @@ function Row({ n, k, f, p, ev }: { n: string; k: string; f: string; p: string; e
 
 /* -------------------------------------------------------------------------- */
 
-function Flow() {
-  /* An explicit type, because a heterogeneous array literal infers a union and
-     s.status would not typecheck on the members that lack it. */
-  const steps: { who: string; what: string; gets: string; status?: string; href?: string }[] = [
-    { who: "Restaurant", what: "signs for the oil it handed over", gets: "paid instantly, in USDC" },
-    { who: "Collector", what: "signs, posts a bond, carries the lot", gets: "bears every shortfall" },
-    { who: "Plant", what: "signs for the weight on the scale", gets: "pays for what it received" },
-    {
-      who: "Investor",
-      what: "holds a compliance-gated share of the truck",
-      /* Was "paid from real revenue" — present tense for something that has never
-         run. The share and its refusals are live; the payout is not. */
-      gets: "paid only out of revenue received",
-      status: "designed, not built",
-      href: "#trucks",
-    },
-  ];
-
-  return (
-    <section className="mx-auto max-w-6xl px-6 py-24">
-      <SectionHead
-        eyebrow="Residual claimant"
-        title="The person who can lie is the person who pays"
-        lede="The restaurant is paid the moment both signatures land, because nobody waits a week for eleven dollars. Any gap between what was attested and what the plant weighed comes out of the collector's bond — never the investors'."
-      />
-
-      <div className="mt-14 grid gap-3 md:grid-cols-4">
-        {steps.map((s, i) => (
-          <div key={s.who} className="glass sheen lift bright p-7">
-            <p className="datum mb-4 text-sm text-oil-dim">0{i + 1}</p>
-            <p className="mb-3 text-lg">{s.who}</p>
-            <p className="mb-5 leading-relaxed text-muted">{s.what}</p>
-            <p className="label border-t border-line pt-4">{s.gets}</p>
-            {s.status && <p className="label mt-2 text-oil-dim">{s.status}</p>}
-            {s.href && (
-              <a href={s.href} className="label mt-3 inline-block transition-colors hover:text-oil">
-                See the share ↓
-              </a>
-            )}
-          </div>
-        ))}
-      </div>
-    </section>
-  );
-}
+/*
+  The residual-claimant cards used to live here, four across. They now sit on
+  /collect and /restaurant, where they explain what the person reading them is
+  actually doing, rather than adding another section to a page a mentor already
+  called too dense to scroll on camera. See app/_components/residual-cards.tsx.
+*/
 
 /* -------------------------------------------------------------------------- */
 

@@ -19,7 +19,7 @@ import { TURMOIL_ABI, TURMOIL_ADDRESS } from "@/lib/turmoil";
  * creates it, with unlimited auto-association (HIP-904), which is why the
  * restaurant never signs a token association either.
  *
- * ponytail: one HBAR, once, from the collector. Cents to keep a customer who
+ * ponytail: half an HBAR, once, from the collector. Cents to keep a customer who
  * would otherwise have to buy crypto to get paid. No oracle, no contract change,
  * and nothing added to attest() that could make a pickup fail.
  *
@@ -28,10 +28,22 @@ import { TURMOIL_ABI, TURMOIL_ADDRESS } from "@/lib/turmoil";
  */
 
 /** Enough for many withdrawals. A transfer costs a small fraction of this. */
-const GRANT = parseEther("1");
+const GRANT = parseEther("0.5");
 
 /** Below this we assume the wallet cannot pay for a transfer. */
 const FLOOR = parseEther("0.1");
+
+/**
+ * The relayer stops giving before it stops working.
+ *
+ * This route is unauthenticated: anyone who can reach it can ask for HBAR, and
+ * the only thing bounding that is the recipient's own balance check — so fresh
+ * addresses could drain the relayer one grant at a time. Testnet HBAR is not
+ * money, but a dry relayer during judging is a dead demo, which costs more than
+ * the funds do. Below this floor onboarding still registers the restaurant and
+ * simply declines to fund it, which is the recoverable half.
+ */
+const RELAYER_FLOOR = parseEther("200");
 
 export async function POST(req: Request) {
   const key = process.env.RELAYER_PRIVATE_KEY as `0x${string}` | undefined;
@@ -46,13 +58,14 @@ export async function POST(req: Request) {
     }
     const who = restaurant as `0x${string}`;
 
+    const account = privateKeyToAccount(key);
     const client = createWalletClient({
-      account: privateKeyToAccount(key),
+      account,
       chain: hederaTestnet,
       transport: http(),
     }).extend(publicActions);
 
-    const [already, balance] = await Promise.all([
+    const [already, balance, relayerBalance] = await Promise.all([
       client.readContract({
         address: TURMOIL_ADDRESS,
         abi: TURMOIL_ABI,
@@ -60,6 +73,7 @@ export async function POST(req: Request) {
         args: [who],
       }) as Promise<boolean>,
       client.getBalance({ address: who }),
+      client.getBalance({ address: account.address }),
     ]);
 
     let registerTx: string | null = null;
@@ -78,14 +92,22 @@ export async function POST(req: Request) {
       await client.waitForTransactionReceipt({ hash: registerTx as `0x${string}` });
     }
 
-    if (balance < FLOOR) {
+    /* Registration is the half that matters and it has already happened above.
+       Funding is a convenience, so it is the half that gets withheld when the
+       relayer is running low rather than failing the whole call. */
+    const needsFunding = balance < FLOOR;
+    const canFund = relayerBalance >= RELAYER_FLOOR;
+    if (needsFunding && canFund) {
       fundTx = await client.sendTransaction({ to: who, value: GRANT });
     }
 
     return NextResponse.json({
       restaurant: who,
       registered: already ? "already" : "now",
-      funded: balance < FLOOR ? "now" : "already",
+      funded: !needsFunding ? "already" : canFund ? "now" : "held",
+      ...(needsFunding && !canFund
+        ? { note: "Relayer is low on HBAR — registered, but not funded. Top it up." }
+        : {}),
       registerTx,
       fundTx,
     });
