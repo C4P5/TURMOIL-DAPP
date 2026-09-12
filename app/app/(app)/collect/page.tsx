@@ -81,6 +81,25 @@ async function loadTruck(collector: `0x${string}`): Promise<Pickup[]> {
   return out.reverse();
 }
 
+/**
+ * The queue, fetched with the driver's session.
+ *
+ * Pure loader outside the component for the same reason as loadTruck: it keeps
+ * the effect a single `.then(setState)` rather than an effect that calls a
+ * function which sets state.
+ */
+async function loadRequests(
+  getAccessToken: () => Promise<string | null>,
+): Promise<PickupRequest[]> {
+  const token = await getAccessToken();
+  const res = await fetch("/api/pickup-request", {
+    headers: { authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) return [];
+  const body = await res.json();
+  return body.requests ?? [];
+}
+
 export default function CollectorPage() {
   const { ready, authenticated, login, logout, getAccessToken } = usePrivy();
 
@@ -118,11 +137,11 @@ export default function CollectorPage() {
      with a guess about who might have oil. */
   const [requests, setRequests] = useState<PickupRequest[]>([]);
   useEffect(() => {
-    fetch("/api/pickup-request")
-      .then((r) => r.json())
-      .then((b) => setRequests(b.requests ?? []))
+    if (!authenticated) return;
+    loadRequests(getAccessToken)
+      .then(setRequests)
       .catch(() => setRequests([]));
-  }, []);
+  }, [authenticated, getAccessToken]);
 
   async function createBatch() {
     setError(null);
@@ -181,7 +200,8 @@ export default function CollectorPage() {
 
   if (!authenticated) {
     return (
-      <div className="ticket max-w-md p-8">
+      <div className="flex min-h-[62vh] items-center justify-center">
+        <div className="ticket w-full max-w-md p-8 text-center">
         <p className="label mb-2">Collector</p>
         <h1 className="mb-6 text-2xl">Sign in to start a pickup</h1>
         <button
@@ -191,6 +211,7 @@ export default function CollectorPage() {
           Sign in
         </button>
         <p className="label mt-3">Drivers only. The company wallet signs, not your phone.</p>
+        </div>
       </div>
     );
   }
@@ -232,9 +253,28 @@ export default function CollectorPage() {
         <select
           id="restaurant"
           value={restaurant}
-          onChange={(e) => setRestaurant(e.target.value)}
-          className="datum mb-5 w-full field px-3 py-2 text-sm"
+          onChange={(e) => {
+            /* A QR signed for the previous selection stays valid for 30
+               minutes. Leaving it on screen invites showing it to the wrong
+               owner and recording the wrong pickup with two genuine
+               signatures. */
+            setRestaurant(e.target.value);
+            setLink(null);
+            setError(null);
+          }}
+          className="datum field select mb-5 w-full px-3 py-2 text-sm"
         >
+          {/*
+            A restaurant that just registered itself through /restaurant is not
+            in the route book, so without this the browser would fall back to
+            displaying the first option while the state held the right address:
+            the screen would name MILANGA and the QR would pay someone else.
+            labelFor degrades to shortened hex, so this needs no new data.
+          */}
+          {restaurant &&
+            !RESTAURANTS.some((r) => r.address?.toLowerCase() === restaurant.toLowerCase()) && (
+              <option value={restaurant}>{labelFor(restaurant)}</option>
+            )}
           {RESTAURANTS.map((r) => (
             <option key={r.name} value={r.address ?? ""} disabled={!canSignInBrowser(r)}>
               {r.name}
@@ -249,7 +289,11 @@ export default function CollectorPage() {
         <input
           id="litres"
           value={litres}
-          onChange={(e) => setLitres(e.target.value.replace(/\D/g, ""))}
+          onChange={(e) => {
+            setLitres(e.target.value.replace(/\D/g, ""));
+            setLink(null);
+            setError(null);
+          }}
           inputMode="numeric"
           className="datum mb-6 w-full field px-3 py-2 text-2xl"
         />

@@ -208,6 +208,43 @@ section[id] {
     inset 0 1px 2px rgb(0 0 0 / 0.5),
     0 0 0 3px rgb(240 160 32 / 0.13);
 }
+/*
+  The venue picker. It inherits .field for the control, but a bare <select> still
+  renders the platform's own arrow and popup, which on Windows is a white list on
+  a dark page — the one control that ignored the design system.
+
+  appearance:none removes the native arrow so our own chevron can sit where the
+  padding reserves room for it. The popup list itself is drawn by the OS and is
+  not stylable beyond the option colours, which Chromium does honour. Declared
+  after .field because .field uses the `background` shorthand, which resets
+  background-image.
+*/
+.select {
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8' fill='none' stroke='%238b8175' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M1 1.75 6 6.25 11 1.75'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.9rem center;
+  background-size: 0.7rem;
+  padding-right: 2.4rem;
+  cursor: pointer;
+}
+
+.select:hover {
+  border-color: rgb(240 160 32 / 0.35);
+}
+
+.select option {
+  background: var(--color-surface-2);
+  color: var(--color-paper);
+}
+
+/* A venue that cannot sign in a browser is offered but not choosable; it has to
+   read as unavailable rather than as merely unselected. */
+.select option:disabled {
+  color: var(--color-muted);
+}
+
 
 /* Interactive glass. The shadow grows faster than the lift, which is what makes
    a panel feel picked up rather than nudged. */

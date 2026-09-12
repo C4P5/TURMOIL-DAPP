@@ -129,14 +129,21 @@ export default function RestaurantPage() {
     setAskError(null);
     setAsking(true);
     try {
+      /* The route calls setRestaurant, which is onlyOwner, so it verifies a Privy
+         session before signing with the owner key. Unauthenticated it would be a
+         public endpoint with owner authority. */
+      const token = await getAccessToken();
       const res = await fetch("/api/onboard", {
         method: "POST",
-        headers: { "content-type": "application/json" },
+        headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
         body: JSON.stringify({ restaurant: address }),
       });
       const body = await res.json();
       if (!res.ok) throw new Error(body.error ?? "Registration failed");
-      setView(await loadRestaurant(address));
+      /* Registered. A failure to re-read the chain afterwards is not a
+         registration failure, and reporting it as one tells the owner their
+         setup broke when it worked. */
+      loadRestaurant(address).then(setView).catch(() => {});
     } catch (e) {
       setAskError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -179,11 +186,15 @@ export default function RestaurantPage() {
       setError("That is not a valid address.");
       return;
     }
-    const units = BigInt(Math.round(Number(amount) * 1_000_000));
-    if (units <= 0n) {
+    /* Validate before converting. Number("1,5") is NaN and BigInt(NaN) throws
+       synchronously, outside the try below — so writing a decimal the way it is
+       written in Montevideo made the Send button silently do nothing at all. */
+    const parsed = Number(amount.replace(",", "."));
+    if (!Number.isFinite(parsed) || parsed <= 0) {
       setError("Enter an amount above zero.");
       return;
     }
+    const units = BigInt(Math.round(parsed * 1_000_000));
     if (units > view.balance) {
       setError("That is more than you have.");
       return;
@@ -226,7 +237,8 @@ export default function RestaurantPage() {
 
   if (!authenticated) {
     return (
-      <div className="ticket max-w-md p-8">
+      <div className="flex min-h-[62vh] items-center justify-center">
+        <div className="ticket w-full max-w-md p-8 text-center">
         <p className="label mb-2">Restaurant</p>
         <h1 className="mb-6 text-2xl">Sign in to ask for a pickup</h1>
         <button
@@ -236,6 +248,7 @@ export default function RestaurantPage() {
           Sign in with email
         </button>
         <p className="label mt-3">No wallet, no app, no fees.</p>
+        </div>
       </div>
     );
   }

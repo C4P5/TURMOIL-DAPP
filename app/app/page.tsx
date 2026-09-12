@@ -30,10 +30,10 @@ export default function Landing() {
         <Nav />
         <Hero />
         <Crime />
+        <Receipt />
         <Limit />
         <Mechanism />
         <Arithmetic />
-        <Receipt />
         <Trucks />
         <Stack />
         <Close />
@@ -115,7 +115,7 @@ function Nav() {
       <a
         href="#top"
         aria-label="Back to top"
-        className="pill datum px-5 py-2.5 text-base tracking-[0.28em] text-oil transition-opacity hover:opacity-80"
+        className="datum text-lg tracking-[0.28em] text-oil transition-opacity hover:opacity-80"
       >
         TURMOIL
       </a>
@@ -369,7 +369,8 @@ function Limit() {
           with their own key, at their own address, on their own schedule.
         </p>
         <p className="mt-6 max-w-3xl text-lg leading-relaxed text-paper">
-          That is a different order of difficulty than buying a certificate.
+          That is a <span className="text-oil">different</span> order of difficulty than buying a
+          certificate.
         </p>
       </div>
     </section>
@@ -404,7 +405,7 @@ const LAYERS = [
     name: "Revenue-gated payout",
     body: "Truck-token holders are paid only out of stablecoin the system actually received. Inflating volume cannot manufacture a distribution. One dividend has been declared on chain and paid by hand; the gating itself is not automated.",
     kills: "Inflation stops paying.",
-    status: "designed",
+    status: "partial",
   },
   {
     tag: "L4",
@@ -443,10 +444,16 @@ function Mechanism() {
                     className={`label rounded border px-2 py-0.5 ${
                       l.status === "live"
                         ? "border-pass/40 text-pass"
-                        : "border-line text-muted"
+                        : l.status === "partial"
+                          ? "border-oil/40 text-oil"
+                          : "border-line text-muted"
                     }`}
                   >
-                    {l.status === "live" ? "live on testnet" : "designed, not built"}
+                    {l.status === "live"
+                      ? "live on testnet"
+                      : l.status === "partial"
+                        ? "on chain, paid by hand"
+                        : "designed, not built"}
                   </span>
                 </div>
                 <p className="leading-relaxed text-muted">{l.body}</p>
@@ -675,8 +682,13 @@ function Close() {
       </div>
 
       <footer className="mt-16 flex flex-wrap items-center justify-between gap-4 border-t border-line pt-8">
-        <p className="label">TURMOIL · ETHOnline 2026 · Hedera testnet</p>
-        <p className="label">Origin Montevideo. The buyer is abroad.</p>
+        <p className="label flex flex-wrap items-center gap-x-3 gap-y-1">
+          <span>TURMOIL · ETHOnline 2026 · Hedera testnet</span>
+          <a href="#top" className="transition-colors hover:text-oil">
+            Go to top ↑
+          </a>
+        </p>
+        <p className="label">Origin Montevideo. Made for the world.</p>
       </footer>
     </section>
   );
