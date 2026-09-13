@@ -380,7 +380,7 @@ export default function RestaurantPage() {
             Sent — view on HashScan
           </a>
         )}
-        {error && <p className="label mt-4 text-[--color-fail]">{error}</p>}
+        {error && <p className="label mt-4 text-fail">{error}</p>}
       </section>
 
       <section className="ticket p-6 md:col-span-2">

@@ -105,11 +105,29 @@ section[id] {
   letter-spacing: -0.01em;
 }
 
-.label {
-  font-size: 0.6875rem;
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
-  color: var(--color-muted);
+/*
+  .label is the one custom class that collides with Tailwind utilities in
+  practice, so it is the one that has to be layered.
+
+  Unlayered rules beat layered ones in the cascade regardless of specificity, and
+  every Tailwind utility lives in @layer utilities. An unlayered .label therefore
+  silently overrode text-oil, text-fail, text-paper and every hover:text-* placed
+  on the same element — nine dead declarations across the app, including the red
+  on the "not configured" banner, whose entire job is to look alarming.
+
+  Wrapping it in @layer components puts it below utilities, which is where a
+  component class belongs: it sets the default, a utility overrides it. The other
+  custom classes are left unlayered on purpose — none of them declare anything a
+  utility is realistically asked to override, and layering them would change
+  precedences nobody has asked for this close to a deadline.
+*/
+@layer components {
+  .label {
+    font-size: 0.6875rem;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--color-muted);
+  }
 }
 
 .stamp {
