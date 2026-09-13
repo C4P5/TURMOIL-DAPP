@@ -25,6 +25,18 @@ A restaurant hands over a drum of used frying oil. A driver measures it, both si
 
 That is the whole product: a receipt for waste oil that two parties signed and a third party's scale has to agree with.
 
+## Contents
+
+- [The problem](#the-problem), and the 2027 regulation that puts a date on it
+- [How it works](#how-it-works) and [the architecture](#architecture)
+- [The audit mechanism](#the-audit-mechanism), and [why cheating loses money](#why-cheating-loses-money)
+- [What this cannot do](#what-this-cannot-do)
+- [Deployed on Hedera testnet](#deployed-on-hedera-testnet), and what was [proven on chain](#proven-on-chain)
+- [The truck share](#the-truck-share) and [its lifecycle](#the-lifecycle-run-on-chain)
+- [What the market pays](#what-the-market-pays) and [what it costs to run](#what-it-costs-to-run)
+- [The app](#the-app) and [running it](#running-it)
+- [Validation](#validation) and [AI attribution](#ai-attribution)
+
 <a id="the-problem"></a>
 
 ## The problem
@@ -52,6 +64,9 @@ The first row is contested, and you should hear it from us rather than find it y
 
 ### The response so far
 
+<details>
+<summary>Suspensions, arrests and an anti-dumping probe, five rows with sources</summary>
+
 | Finding | Date | Source |
 |---|---|---|
 | EU member states tabled a proposed 2.5-year suspension of ISCC recognition for waste-based biofuels. ISCC states no vote was taken and no decision made at the March 2025 meeting, so it remains a live proposal | Mar 2025 | [QC Intel](https://www.qcintel.com/biofuels/article/eu-countries-propose-plan-to-suspend-iscc-waste-biofuel-certification-sources-38517.html) · [ISCC's response](https://www.iscc-system.org/news/on-the-recent-discussions-on-iscc-eu-certification-for-waste-based-biofuels/) |
@@ -59,6 +74,8 @@ The first row is contested, and you should hear it from us rather than find it y
 | Germany's BLE linked two companies to certification fraud | May 2025 | [S&P Global](https://www.spglobal.com/energy/en/news-research/latest-news/crude-oil/050725-german-biofuels-regulator-links-two-companies-to-certification-fraud) |
 | The European Commission opened an anti-dumping investigation, plus a probe into Indonesian biodiesel routed via China to evade duties | Dec 2023 | [Fastmarkets](https://www.fastmarkets.com/insights/ec-confirms-china-eu-waste-biofuel-probe/) |
 | Eleven arrests in Indonesia, customs officials and executives, over virgin palm oil declared as POME | Feb 2026 | QC Intel |
+
+</details>
 
 Palm oil and used cooking oil are chemically similar enough that you cannot reliably tell them apart by looking, and largely not by testing either. So the market runs on paperwork, and the body issuing that paperwork certified more POME than the planet is thought to produce, and a refinery that was not there. A certificate is a claim made by one party about oil nobody else saw.
 
@@ -118,7 +135,71 @@ A leaked copy of the server's credentials therefore steals nothing. The worst it
 
 ---
 
-<a id="why-cheating-loses-money"></a>
+## Architecture
+
+Four parties sign, and no single one of them can record a pickup.
+
+```mermaid
+graph TB
+    subgraph Signers["Who signs"]
+        R["Restaurant<br/>Privy embedded wallet"]
+        D["Driver<br/>Privy session, holds no key"]
+        P["Plant<br/>its own key"]
+        I["Investor<br/>self-custody"]
+    end
+
+    subgraph App["Next.js app"]
+        REQ["/api/pickup-request<br/>the queue"]
+        CS["/api/collector-sign<br/>driver list, then the policy"]
+        AT["/api/attest<br/>relays two signatures"]
+    end
+
+    CW["Company wallet<br/>Privy server wallet, policy-bound"]
+
+    subgraph Chain["Hedera testnet, chain 296"]
+        T["Turmoil.sol<br/>attest, mass balance, audit"]
+        PRNG["0x169 PRNG<br/>HIP-351"]
+        USDC[("Settlement token<br/>6 decimals")]
+        ATS["TURMOIL UNIT 001<br/>ERC-3643 via ATS"]
+    end
+
+    R -->|asks for a pickup| REQ
+    D -->|reads the queue| REQ
+    D -->|asks for a signature| CS
+    CS --> CW
+    CW -->|Batch typed data| AT
+    R -->|signs the same Batch| AT
+    AT -->|both signatures| T
+    T -->|pays instantly| USDC
+    USDC --> R
+    P -->|signs the weight| T
+    T -->|samples after sealing| PRNG
+    I -->|holds shares| ATS
+    ATS -->|dividend| I
+```
+
+One pickup, end to end:
+
+```mermaid
+sequenceDiagram
+    participant Rest as Restaurant
+    participant Driver
+    participant Wallet as Company wallet
+    participant Chain as Turmoil.sol
+    participant Plant
+
+    Rest->>Driver: requests a pickup (off chain)
+    Driver->>Wallet: sign this Batch
+    Wallet-->>Driver: signature, or policy_violation
+    Driver->>Rest: QR carrying the batch
+    Rest->>Chain: attest(batch, both signatures)
+    Chain-->>Rest: USDC, in the same transaction
+    Plant->>Chain: settleLot(weight, plant signature)
+    Note over Chain: Σ attested ≤ received + tolerance,<br/>or the collector's bond pays the gap
+    Chain->>Chain: drawAudit via 0x169, after sealing
+    Rest->>Chain: confirmBatch with its own key
+    Note over Chain: no answer, and the whole bond burns
+```
 
 ## The audit mechanism
 
@@ -165,7 +246,10 @@ Hypergeometric, sampling without replacement, expressed as a fraction of lot val
 | TURMOIL types its own received weight | Reverts. The figure needs a registered plant's signature |
 | TURMOIL flags an honest restaurant | Reverts. A restaurant that confirmed cannot be flagged, and it has a challenge window to answer in |
 
-These are executable tests in [`contracts/test/Turmoil.t.sol`](contracts/test/Turmoil.t.sol), 22 of them, passing:
+These are executable tests in [`contracts/test/Turmoil.t.sol`](contracts/test/Turmoil.t.sol), 22 of them, passing.
+
+<details>
+<summary>The test names, if you want them without cloning</summary>
 
 ```
 test_RevertWhen_OnlyRestaurantSigns                  one party cannot invent a pickup
@@ -185,6 +269,8 @@ test_RevertWhen_FlaggedBeforeChallengeWindowCloses   it gets time to answer
 test_RevertWhen_SomeoneElseConfirmsForTheRestaurant  only its own key will do
 testFuzz_ShortfallIsAlwaysChargedToTheCollector      (runs: 2000)
 ```
+
+</details>
 
 The fuzz test is the one that matters: 2,000 random `(attested, received)` pairs, asserting the gap is always charged to the collector or capped at their bond, never absorbed by investors. Most of these exist because a strict review found the mechanism they test missing or wrong, and each fix landed with the test that would have caught it.
 
@@ -357,6 +443,16 @@ The auto-association row is load-bearing. Without HIP-904 defaults a restaurant 
 ## The app
 
 Next.js with the Privy React SDK. Email login creates an embedded wallet, and the restaurant signs typed data without ever sending a transaction.
+
+| Layer | Choice | Doing what |
+|---|---|---|
+| Contract | Solidity 0.8.24, Foundry | One contract, 22 tests, mass balance fuzzed at 2,000 runs |
+| Chain | Hedera testnet, chain 296 | `0x169` PRNG, HIP-904 auto-association, Asset Tokenization Studio |
+| Frontend | Next.js 16, React 19, Tailwind 4 | A static landing page and four app routes |
+| Chain access | viem 2 | Reads, writes, and EIP-712 typed data |
+| Wallets | `@privy-io/react-auth` 3, `@privy-io/node` 0.34 | Email logins for restaurants, a policy-bound server wallet for the company |
+| Server auth | jose against Privy's JWKS | Access tokens verified before the owner key signs anything |
+| RWA | ERC-3643 through ATS | Truck shares, allow list, KYC, dividends |
 
 | Route | Who | What happens |
 |---|---|---|
