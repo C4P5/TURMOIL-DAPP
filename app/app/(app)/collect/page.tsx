@@ -163,8 +163,11 @@ export default function CollectorPage() {
         },
         body: JSON.stringify({ restaurant, litres: Number(litres), ref, deadline }),
       });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error ?? `Could not sign this pickup (${res.status}).`);
+      }
       const body = await res.json();
-      if (!res.ok) throw new Error(body.error ?? "Could not sign this pickup.");
 
       const params = new URLSearchParams({
         restaurant,

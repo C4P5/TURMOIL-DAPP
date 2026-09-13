@@ -43,6 +43,10 @@ function explain(e: unknown): string {
  * the demo's stand-in for that, and it is the reason a restaurant owner never
  * needs HBAR.
  */
+/* Simulate, write, then wait for a Hedera receipt. Seconds, not milliseconds,
+   and the platform default would cut it off while the pickup is being recorded. */
+export const maxDuration = 60;
+
 export async function POST(req: Request) {
   const key = process.env.RELAYER_PRIVATE_KEY as `0x${string}` | undefined;
   if (!key) {

@@ -138,8 +138,13 @@ export default function RestaurantPage() {
         headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
         body: JSON.stringify({ restaurant: address }),
       });
-      const body = await res.json();
-      if (!res.ok) throw new Error(body.error ?? "Registration failed");
+      /* Status before parsing. A platform timeout returns HTML or nothing, and
+         res.json() would then throw "Unexpected end of JSON input" over a
+         registration that may well have landed on chain. */
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error ?? `Registration failed (${res.status})`);
+      }
       /* Registered. A failure to re-read the chain afterwards is not a
          registration failure, and reporting it as one tells the owner their
          setup broke when it worked. */
@@ -163,8 +168,11 @@ export default function RestaurantPage() {
         headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
         body: JSON.stringify({ restaurant: address, litres: Number(askLitres) }),
       });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error ?? `Could not send the request (${res.status})`);
+      }
       const body = await res.json();
-      if (!res.ok) throw new Error(body.error ?? "Could not send the request");
       setAsked(
         body.updated
           ? `Updated — the driver will collect about ${askLitres} litres.`

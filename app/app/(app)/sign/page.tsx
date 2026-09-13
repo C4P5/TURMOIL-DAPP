@@ -90,8 +90,14 @@ function SignInner() {
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ restaurant, collector, litres, ref, deadline, sigRestaurant, sigCollector }),
       });
+      /* A platform timeout here is the worst case in the app: the batch may be
+         on chain and the owner would be told it failed. Check the status first
+         so the message is the server's, not a JSON parse error. */
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error ?? `Could not submit this pickup (${res.status}).`);
+      }
       const body = await res.json();
-      if (!res.ok) throw new Error(body.error ?? "Relay failed");
 
       setTxHash(body.txHash);
       setState("done");

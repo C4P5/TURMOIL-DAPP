@@ -41,6 +41,16 @@ import { isDenied, ownsWallet, requireUser } from "@/lib/auth";
 /* @privy-io/node and viem both want node APIs. Do not let this move to edge. */
 export const runtime = "nodejs";
 
+/**
+ * This route is the longest in the app and the first thing a new restaurant
+ * clicks: a Privy round trip to prove wallet ownership, three chain reads, an
+ * onchain write, a receipt wait, and possibly a transfer. Hedera receipts alone
+ * run seconds through the relay, and the platform default cap is tight enough
+ * to cut that off mid-write, which would report failure for a registration that
+ * actually landed.
+ */
+export const maxDuration = 60;
+
 /** Enough for many withdrawals. A transfer costs a small fraction of this. */
 const GRANT = parseEther("0.5");
 

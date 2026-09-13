@@ -35,6 +35,9 @@ import { isDenied, requireDriver } from "@/lib/auth";
 
 export const runtime = "nodejs";
 
+/* Two Privy round trips: verifying the driver, then asking the wallet to sign. */
+export const maxDuration = 60;
+
 const APP_ID = process.env.NEXT_PUBLIC_PRIVY_APP_ID;
 const APP_SECRET = process.env.PRIVY_APP_SECRET;
 const WALLET_ID = process.env.PRIVY_WALLET_ID;
